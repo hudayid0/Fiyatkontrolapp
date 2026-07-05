@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Fiyat Kontrol</string>
+    <string name="title_activity_main">Fiyat Kontrol</string>
+    <string name="package_name">com.hudayi.fiyatkontrol</string>
+    <string name="custom_url_scheme">com.hudayi.fiyatkontrol</string>
+</resources>
