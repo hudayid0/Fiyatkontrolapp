@@ -816,7 +816,7 @@ async function searchByName(){
     `;
     state.lastSearchResults = products;
   }catch(err){
-    box.innerHTML = `<div class="error">Arama başarısız: ${err.message}</div>`;
+    box.innerHTML = `<div class="error">Ürün adıyla arama şu an güvenilir çalışmıyor (Open Food Facts'in bu servisi beta aşamasında). En sağlam yol: yukarıdan "Barkod" sekmesine geçip kamerayla veya elle barkod ile aramak.</div>`;
   }
 }
 
