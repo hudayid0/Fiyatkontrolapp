@@ -793,10 +793,10 @@ async function searchByName(){
   addToHistory('name', query);
   box.innerHTML = `<div class="result"><span class="spinner"></span>Aranıyor...</div>`;
   try{
-    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=5`;
     const res = await fetch(url);
     const data = await res.json();
-    const products = (data.products || []).filter(p => p.product_name);
+    const products = (data.hits || data.products || []).filter(p => p.product_name);
     if(products.length === 0){
       box.innerHTML = `<div class="error">"${query}" için sonuç bulunamadı. Farklı bir arama terimi dene ya da barkod ile ara.</div>`;
       return;
