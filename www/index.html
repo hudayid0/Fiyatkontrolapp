@@ -510,6 +510,48 @@
     transition:opacity .15s ease, border-color .15s ease;
   }
   .lang-btn.active{opacity:1; border-color:var(--gold);}
+  .store-name{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    color:var(--text-dim);
+    margin-top:3px;
+  }
+  .go-btn{
+    display:inline-block;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--teal);
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    font-weight:600;
+    text-decoration:none;
+    padding:6px 12px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .ad-banner{
+    background:var(--surface);
+    border:1px dashed var(--line);
+    border-radius:14px;
+    padding:14px;
+    text-align:center;
+    position:relative;
+    margin-top:12px;
+  }
+  .ad-label{
+    position:absolute;
+    top:8px;
+    right:12px;
+    font-size:9px;
+    letter-spacing:0.08em;
+    color:var(--text-dim);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .ad-placeholder{
+    font-size:12px;
+    color:var(--text-dim);
+    padding:16px 8px;
+  }
 </style>
 </head>
 <body>
@@ -595,7 +637,85 @@ const TRANSLATIONS = {
   trackEmpty: {tr:'Henüz takip ettiğin bir ürün yok.', en:'No tracked products yet.', ja:'まだ追跡中の商品はありません。', zh:'暂无关注的商品。'},
   dropBtn: {tr:'Bırak', en:'Remove', ja:'削除', zh:'移除'},
   footerTracking: {tr:'Bildirimler: Capacitor Local Notifications', en:'Notifications: Capacitor Local Notifications', ja:'通知: Capacitor Local Notifications', zh:'通知: Capacitor Local Notifications'},
+
+  camStartHint: {tr:'Kamerayı başlatmak için dokun', en:'Tap to start camera', ja:'タップしてカメラを起動', zh:'点击启动相机'},
+  camOpenBtn2: {tr:'Kamerayı Aç', en:'Open Camera', ja:'カメラを開く', zh:'打开相机'},
+  camCloseBtn: {tr:'Kamerayı Kapat', en:'Close Camera', ja:'カメラを閉じる', zh:'关闭相机'},
+  barcodeLabel: {tr:'Barkod (EAN/UPC)', en:'Barcode (EAN/UPC)', ja:'バーコード (EAN/UPC)', zh:'条码 (EAN/UPC)'},
+  barcodeHintDefault: {tr:'8, 12, 13 ya da 14 haneli bir sayı olmalı.', en:'Must be 8, 12, 13, or 14 digits.', ja:'8、12、13、または14桁である必要があります。', zh:'必须为8、12、13或14位数字。'},
+  barcodeHintValid: {tr:'✓ Geçerli format', en:'✓ Valid format', ja:'✓ 有効な形式', zh:'✓ 格式有效'},
+  productNameLabel: {tr:'Ürün adı', en:'Product name', ja:'商品名', zh:'商品名称'},
+  enterBarcodeMsg: {tr:'Bir barkod numarası gir.', en:'Enter a barcode number.', ja:'バーコード番号を入力してください。', zh:'请输入条码号。'},
+  searchingProduct: {tr:'Ürün aranıyor...', en:'Searching product...', ja:'商品を検索中...', zh:'正在搜索商品...'},
+  barcodeNotFoundMsg: {tr:'Bu barkod veritabanında bulunamadı. Ürün adını biliyorsan "Ürün Adı" sekmesinden aramayı dene.', en:'This barcode was not found. If you know the product name, try the "Product Name" tab.', ja:'このバーコードは見つかりませんでした。商品名がわかる場合は「商品名」タブでお試しください。', zh:'未找到此条码。如果您知道商品名称,请尝试"商品名称"标签。'},
+  enterProductNameMsg: {tr:'Bir ürün adı gir.', en:'Enter a product name.', ja:'商品名を入力してください。', zh:'请输入商品名称。'},
+  searchingText: {tr:'Aranıyor...', en:'Searching...', ja:'検索中...', zh:'搜索中...'},
+  nameSearchUnstable: {tr:'Ürün adıyla arama şu an güvenilir çalışmıyor. En sağlam yol: "Barkod" sekmesine geçip kamerayla veya elle barkod ile aramak.', en:'Name search is currently unreliable. Best option: switch to the "Barcode" tab and search by barcode instead.', ja:'名前検索は現在不安定です。「バーコード」タブでの検索をお勧めします。', zh:'名称搜索目前不稳定。建议切换到"条码"标签进行搜索。'},
+  trackModalEyebrow: {tr:'🔔 Fiyat Takibi', en:'🔔 Price Tracking', ja:'🔔 価格追跡', zh:'🔔 价格追踪'},
+  trackModalSub: {tr:'Hedef fiyatını gir (€) — bu fiyata ulaşınca hatırlatma alırsın.', en:'Enter your target price (€) — you will get a reminder when it is reached.', ja:'目標価格を入力してください(€)。到達するとリマインダーが届きます。', zh:'输入目标价格(€)——达到后您将收到提醒。'},
+  trackVazgec: {tr:'Vazgeç', en:'Cancel', ja:'キャンセル', zh:'取消'},
+  trackConfirm: {tr:'Takip Et', en:'Track', ja:'追跡する', zh:'追踪'},
+  trackNoPermission: {tr:'Ürün takip listesine eklendi. Bildirim izni verilmediği için hatırlatma gönderilemeyecek.', en:'Product added to watchlist. Since notification permission was not granted, reminders cannot be sent.', ja:'商品はウォッチリストに追加されました。通知の許可がないためリマインダーは送信されません。', zh:'商品已加入关注列表。由于未授予通知权限,将无法发送提醒。'},
+  adSponsored: {tr:'SPONSORLU', en:'SPONSORED', ja:'スポンサー', zh:'赞助'},
+  adPlaceholderText: {tr:'Reklam alanı — gerçek uygulamada AdMob banner burada görünür', en:'Ad space — a real AdMob banner appears here in the real app', ja:'広告スペース — 実際のアプリではここにAdMobバナーが表示されます', zh:'广告位——实际应用中此处会显示AdMob横幅'},
+  compareStoreCountry: {tr:'Mağaza / Ülke', en:'Store / Country', ja:'店舗・国', zh:'商店/国家'},
+  comparePrice: {tr:'Fiyat', en:'Price', ja:'価格', zh:'价格'},
+  compareNote1: {tr:'Not: Bu karşılaştırma tablosu örnek (simüle) verilerle çalışıyor. Gerçek fiyatlar için resmi mağaza API\'lerinin bağlanması gerekiyor.', en:'Note: This comparison table uses sample (simulated) data. Real prices require connecting official store APIs.', ja:'注: この比較表はサンプル(シミュレーション)データを使用しています。実際の価格には公式店舗APIの連携が必要です。', zh:'注:此比较表使用示例(模拟)数据。真实价格需要连接官方商店API。'},
+  compareNote2: {tr:'"Git" linkleri affiliate/ortaklık bağlantılarıdır — bir mağazadan alışveriş yaparsan küçük bir komisyon kazanabiliriz, senin ödediğin fiyatı değiştirmez.', en:'"Go" links are affiliate links — if you shop through a store we may earn a small commission, at no extra cost to you.', ja:'「移動」リンクはアフィリエイトリンクです。購入すると少額の手数料を得ることがありますが、あなたの支払額は変わりません。', zh:'"前往"链接为联盟链接——如果您通过商店购物,我们可能获得少量佣金,不会增加您的费用。'},
+  goBtn: {tr:'Git', en:'Go', ja:'移動', zh:'前往'},
 };
+
+const TRANSLATIONS_FN = {
+  invalidBarcodeFormat: (len) => ({
+    tr: `Geçersiz barkod formatı: ${len} hane girildi. Barkodlar genelde 8, 12, 13 ya da 14 hanelidir.`,
+    en: `Invalid barcode format: ${len} digits entered. Barcodes are usually 8, 12, 13, or 14 digits.`,
+    ja: `無効なバーコード形式: ${len}桁入力されました。通常は8、12、13、14桁です。`,
+    zh: `条码格式无效:输入了${len}位。条码通常为8、12、13或14位。`,
+  }),
+  barcodeHintInvalid: (len) => ({
+    tr: `${len} hane girildi — 8, 12, 13 ya da 14 hane olmalı.`,
+    en: `${len} digits entered — must be 8, 12, 13, or 14.`,
+    ja: `${len}桁入力されました — 8、12、13、14桁である必要があります。`,
+    zh: `已输入${len}位——必须为8、12、13或14位。`,
+  }),
+  productFetchError: (msg) => ({
+    tr: `Ürün bilgisi alınamadı: ${msg}`,
+    en: `Could not fetch product info: ${msg}`,
+    ja: `商品情報を取得できませんでした: ${msg}`,
+    zh: `无法获取商品信息:${msg}`,
+  }),
+  noResultsFor: (query) => ({
+    tr: `"${query}" için sonuç bulunamadı. Farklı bir arama terimi dene ya da barkod ile ara.`,
+    en: `No results for "${query}". Try a different search term or search by barcode.`,
+    ja: `「${query}」の結果が見つかりません。別の検索語かバーコードでお試しください。`,
+    zh: `未找到"${query}"的结果。请尝试其他搜索词或使用条码搜索。`,
+  }),
+  trackScheduleError: (msg) => ({
+    tr: `Ürün takip listesine eklendi ama bildirim planlanamadı: ${msg}`,
+    en: `Product added to watchlist but reminder could not be scheduled: ${msg}`,
+    ja: `商品は追加されましたが、リマインダーを設定できませんでした: ${msg}`,
+    zh: `商品已添加但无法设置提醒:${msg}`,
+  }),
+  trackSuccess: (name) => ({
+    tr: `"${name}" takip listesine eklendi. Her gün hatırlatma bildirimi alacaksın.`,
+    en: `"${name}" added to your watchlist. You will get a daily reminder.`,
+    ja: `「${name}」がウォッチリストに追加されました。毎日リマインダーが届きます。`,
+    zh: `"${name}"已加入关注列表。您将每天收到提醒。`,
+  }),
+  compareMatch: (score) => ({
+    tr: `%${score} eşleşme`,
+    en: `${score}% match`,
+    ja: `一致度 ${score}%`,
+    zh: `匹配度 ${score}%`,
+  }),
+};
+
+function td(key, ...args){
+  const entry = TRANSLATIONS_FN[key];
+  if(!entry) return key;
+  const result = entry(...args);
+  return result[state.lang] || result.tr;
+}
 
 function t(key){
   const entry = TRANSLATIONS[key];
@@ -727,9 +847,9 @@ function renderScan(){
     </header>
     <main>
       <div class="scan-box" id="scan-box">
-        <p class="cam-msg" id="cam-msg">Kamerayı başlatmak için dokun</p>
+        <p class="cam-msg" id="cam-msg">${t('camStartHint')}</p>
       </div>
-      <button class="primary teal-btn" id="cam-btn" onclick="startCamera()">Kamerayı Aç</button>
+      <button class="primary teal-btn" id="cam-btn" onclick="startCamera()">${t('camOpenBtn')}</button>
       <div class="divider">${t('orManual')}</div>
 
       <div class="tabs">
@@ -739,17 +859,17 @@ function renderScan(){
 
       ${mode === 'barcode' ? `
         <div>
-          <label>Barkod (EAN/UPC)</label>
+          <label>${t('barcodeLabel')}</label>
           <input type="text" id="barcode" placeholder="Örn. 4006381333931" inputmode="numeric" maxlength="14" />
-          <div class="hint" id="barcode-hint">8, 12, 13 ya da 14 haneli bir sayı olmalı.</div>
+          <div class="hint" id="barcode-hint">${t('barcodeHintDefault')}</div>
         </div>
-        <button class="primary" onclick="lookupBarcode()">Ürünü Bul</button>
+        <button class="primary" onclick="lookupBarcode()">${t('findProductBtn')}</button>
       ` : `
         <div>
-          <label>Ürün adı</label>
+          <label>${t('productNameLabel')}</label>
           <input type="text" id="product-name" placeholder="Örn. Nutella 400g" />
         </div>
-        <button class="primary" onclick="searchByName()">Ara</button>
+        <button class="primary" onclick="searchByName()">${t('searchBtn')}</button>
       `}
 
       <div id="scan-result"></div>
@@ -781,13 +901,13 @@ function attachHandlers(){
       const len = e.target.value.length;
       const valid = [8,12,13,14].includes(len);
       if(len === 0){
-        hint.textContent = '8, 12, 13 ya da 14 haneli bir sayı olmalı.';
+        hint.textContent = t('barcodeHintDefault');
         hint.classList.remove('warn');
       }else if(valid){
-        hint.textContent = '✓ Geçerli format';
+        hint.textContent = t('barcodeHintValid');
         hint.classList.remove('warn');
       }else{
-        hint.textContent = `${len} hane girildi — 8, 12, 13 ya da 14 hane olmalı.`;
+        hint.textContent = td('barcodeHintInvalid', len);
         hint.classList.add('warn');
       }
     });
@@ -876,7 +996,7 @@ async function startCamera(){
     box.innerHTML = `<video id="video" autoplay playsinline muted></video><div class="scan-frame"></div>`;
     const video = document.getElementById('video');
     video.srcObject = stream;
-    btn.textContent = 'Kamerayı Kapat';
+    btn.textContent = t('camCloseBtn');
     btn.setAttribute('onclick','stopCamera(); resetCamBox();');
 
     if('BarcodeDetector' in window){
@@ -913,8 +1033,8 @@ function resetCamBox(){
   const box = document.getElementById('scan-box');
   const btn = document.getElementById('cam-btn');
   if(!box) return;
-  box.innerHTML = `<p class="cam-msg">Kamerayı başlatmak için dokun</p>`;
-  if(btn){ btn.textContent = 'Kamerayı Aç'; btn.setAttribute('onclick','startCamera()'); }
+  box.innerHTML = `<p class="cam-msg">${t('camStartHint')}</p>`;
+  if(btn){ btn.textContent = t('camOpenBtn'); btn.setAttribute('onclick','startCamera()'); }
 }
 
 // ---- Product lookup (Open Food Facts - real API) ----
@@ -922,27 +1042,27 @@ async function lookupBarcode(){
   const code = document.getElementById('barcode').value.trim();
   const box = document.getElementById('scan-result');
   if(!code){
-    box.innerHTML = `<div class="error">Bir barkod numarası gir.</div>`;
+    box.innerHTML = `<div class="error">${t('enterBarcodeMsg')}</div>`;
     return;
   }
   if(![8,12,13,14].includes(code.length)){
-    box.innerHTML = `<div class="error">Geçersiz barkod formatı: ${code.length} hane girildi. Barkodlar genelde 8, 12, 13 ya da 14 hanelidir — numarayı kontrol et.</div>`;
+    box.innerHTML = `<div class="error">${td('invalidBarcodeFormat', code.length)}</div>`;
     return;
   }
   addToHistory('barcode', code);
-  box.innerHTML = `<div class="result"><span class="spinner"></span>Ürün aranıyor...</div>`;
+  box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingProduct')}</div>`;
   try{
     const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
     const data = await res.json();
     if(data.status !== 1){
       box.innerHTML = `
-        <div class="error">Bu barkod veritabanında bulunamadı. (Open Food Facts çoğunlukla gıda/kozmetik ürünlerini kapsar — elektronik/tekstil gibi ürünler için farklı bir barkod servisi entegre edilmesi gerekir.) Ürün adını biliyorsan "Ürün Adı" sekmesinden aramayı dene.</div>
+        <div class="error">${t('barcodeNotFoundMsg')}</div>
       `;
       return;
     }
     renderProductResult(data.product, code);
   }catch(err){
-    box.innerHTML = `<div class="error">Ürün bilgisi alınamadı: ${err.message}</div>`;
+    box.innerHTML = `<div class="error">${td('productFetchError', err.message)}</div>`;
   }
 }
 
@@ -951,18 +1071,18 @@ async function searchByName(){
   const query = document.getElementById('product-name').value.trim();
   const box = document.getElementById('scan-result');
   if(!query){
-    box.innerHTML = `<div class="error">Bir ürün adı gir.</div>`;
+    box.innerHTML = `<div class="error">${t('enterProductNameMsg')}</div>`;
     return;
   }
   addToHistory('name', query);
-  box.innerHTML = `<div class="result"><span class="spinner"></span>Aranıyor...</div>`;
+  box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingText')}</div>`;
   try{
     const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=5`;
     const res = await fetch(url);
     const data = await res.json();
     const products = (data.hits || data.products || []).filter(p => p.product_name);
     if(products.length === 0){
-      box.innerHTML = `<div class="error">"${query}" için sonuç bulunamadı. Farklı bir arama terimi dene ya da barkod ile ara.</div>`;
+      box.innerHTML = `<div class="error">${td('noResultsFor', query)}</div>`;
       return;
     }
     box.innerHTML = `
@@ -1035,28 +1155,63 @@ function similarity(a, b){
 // Advertising API, PriceAPI) entegre edilmelidir. Bu prototipte, aynı ürün adının
 // yurtdışı mağazalarında hafif farklı yazılmış hallerini simüle edip fuzzy matching
 // ile eşleştirme mantığını göstermek için örnek veriler kullanılıyor.
+const AFFILIATE_IDS = {
+  'amazon.de': 'SENIN_ID-21',
+  'amazon.fr': 'SENIN_ID-21',
+  'amazon.co.uk': 'SENIN_ID-21',
+  'hepsiburada.com': '',
+};
+
+function buildAffiliateUrl(storeDomain, query){
+  const searchUrl = `https://www.${storeDomain}/s?k=${encodeURIComponent(query)}`;
+  const affId = AFFILIATE_IDS[storeDomain];
+  return affId ? `${searchUrl}&tag=${affId}` : searchUrl;
+}
+
+function renderAdBanner(){
+  return `
+    <div class="ad-banner">
+      <span class="ad-label">${t('adSponsored')}</span>
+      <div class="ad-placeholder">${t('adPlaceholderText')}</div>
+    </div>
+  `;
+}
+
 function buildComparison(name, brand){
+  const query = `${brand} ${name}`.trim();
   const variants = [
-    {country:'🇩🇪 Almanya', label: `${brand} ${name}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
-    {country:'🇫🇷 Fransa', label: `${name} - ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
-    {country:'🇬🇧 İngiltere', label: `${name}, ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
-    {country:'🇹🇷 Türkiye', label: `${brand} ${name} TR`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇩🇪 Almanya', store:'amazon.de', label: `${brand} ${name}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇫🇷 Fransa', store:'amazon.fr', label: `${name} - ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇬🇧 İngiltere', store:'amazon.co.uk', label: `${name}, ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇹🇷 Türkiye', store:'hepsiburada.com', label: `${brand} ${name} TR`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
   ];
-  const base = `${brand} ${name}`.trim();
-  variants.forEach(v => v.score = similarity(base, v.label));
+  variants.forEach(v => {
+    v.score = similarity(query, v.label);
+    v.url = buildAffiliateUrl(v.store, query);
+  });
   const minPrice = Math.min(...variants.map(v=>v.priceEur));
   const rows = variants.map(v => `
     <tr>
-      <td class="name-col">${v.country}<span class="match-tag ${v.score>=80?'match-high':'match-mid'}">%${v.score} eşleşme</span></td>
+      <td class="name-col">
+        ${v.country}<span class="match-tag ${v.score>=80?'match-high':'match-mid'}">${td('compareMatch', v.score)}</span>
+        <div class="store-name">${v.store}</div>
+      </td>
       <td class="${v.priceEur===minPrice?'cheapest':''}">€ ${v.priceEur.toFixed(2)}</td>
+      <td>
+        <a class="go-btn" href="${v.url}" target="_blank" rel="sponsored noopener">${t('goBtn')}</a>
+      </td>
     </tr>
   `).join('');
   return `
     <table class="compare">
-      <thead><tr><th>Mağaza / Ülke</th><th>Fiyat</th></tr></thead>
+      <thead><tr><th>${t('compareStoreCountry')}</th><th>${t('comparePrice')}</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="note">Not: Bu karşılaştırma tablosu örnek (simüle) verilerle çalışıyor. Gerçek fiyatlar için resmi mağaza API'lerinin bağlanması gerekiyor — bu bir sonraki adım olabilir.</div>
+    <div class="note">
+      ${t('compareNote1')}<br><br>
+      ${t('compareNote2')}
+    </div>
+    ${renderAdBanner()}
   `;
 }
 
@@ -1125,7 +1280,7 @@ async function trackProduct(name, brand, code, targetPrice){
 
   const granted = await requestNotificationPermission();
   if(!granted){
-    alert('Ürün takip listesine eklendi. Bildirim izni verilmediği için hatırlatma gönderilemeyecek.');
+    alert(t('trackNoPermission'));
     return;
   }
 
@@ -1138,9 +1293,9 @@ async function trackProduct(name, brand, code, targetPrice){
         schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
       }]
     });
-    alert(`"${name}" takip listesine eklendi. Her gün hatırlatma bildirimi alacaksın.`);
+    alert(td('trackSuccess', name));
   }catch(e){
-    alert('Ürün takip listesine eklendi ama bildirim planlanamadı: ' + e.message);
+    alert(td('trackScheduleError', e.message));
   }
 }
 
@@ -1159,13 +1314,13 @@ function promptTrackProduct(name, brand, code){
   overlay.id = 'track-modal-overlay';
   overlay.innerHTML = `
     <div class="modal-card">
-      <p class="eyebrow">🔔 Fiyat Takibi</p>
+      <p class="eyebrow">${t('trackModalEyebrow')}</p>
       <h3 class="modal-title">${name}</h3>
-      <p class="modal-sub">Hedef fiyatını gir (€) — bu fiyata ulaşınca hatırlatma alırsın.</p>
+      <p class="modal-sub">${t('trackModalSub')}</p>
       <input type="number" id="target-price-input" value="5.00" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
-        <button class="modal-btn-secondary" onclick="closeTrackModal()">Vazgeç</button>
-        <button class="modal-btn-primary" onclick="confirmTrackProduct('${safeName2}','${safeBrand2}','${code}')">Takip Et</button>
+        <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
+        <button class="modal-btn-primary" onclick="confirmTrackProduct('${safeName2}','${safeBrand2}','${code}')">${t('trackConfirm')}</button>
       </div>
     </div>
   `;
