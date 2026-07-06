@@ -945,6 +945,11 @@ function goTo(screen){
   stopCamera();
   state.screen = screen;
   render();
+  if(screen === 'scan'){
+    showBannerAd();
+  }else{
+    hideBannerAd();
+  }
 }
 
 // ---- Screen 1: currency conversion (static/frozen rates, no network call) ----
@@ -1343,6 +1348,50 @@ function confirmTrackProduct(name, brand, code){
   closeTrackModal();
   trackProduct(name, brand, code, target);
 }
+
+// ---- AdMob entegrasyonu ----
+// NOT: Bu asagidaki ID'ler Google'in resmi TEST ID'leridir, gercek para
+// kazandirmaz. Gercek AdMob hesabini actiktan sonra bu ID'leri kendi
+// gercek App ID ve Ad Unit ID'lerinle degistirmen gerekiyor.
+const ADMOB_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111';
+let admobReady = false;
+
+async function initAdMob(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    await window.Capacitor.Plugins.AdMob.initialize({
+      testingDevices: [],
+      initializeForTesting: true,
+    });
+    admobReady = true;
+  }catch(e){
+    console.log('AdMob baslatilamadi:', e.message);
+  }
+}
+
+async function showBannerAd(){
+  if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    await window.Capacitor.Plugins.AdMob.showBanner({
+      adId: ADMOB_BANNER_ID,
+      adSize: 'BANNER',
+      position: 'BOTTOM_CENTER',
+      margin: 0,
+      isTesting: true,
+    });
+  }catch(e){
+    console.log('Banner gosterilemedi:', e.message);
+  }
+}
+
+async function hideBannerAd(){
+  if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    await window.Capacitor.Plugins.AdMob.hideBanner();
+  }catch(e){}
+}
+
+initAdMob();
 
 render();
 </script>
