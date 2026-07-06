@@ -648,7 +648,7 @@ function rateStatusLabel(){
     const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
     const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
     const labels = {
-      tr: `Canli kur · saat ${hh}:${mm} itibariyla`,
+      tr: `Canlı kur · saat ${hh}:${mm} itibarıyla`,
       en: `Live rate · as of ${hh}:${mm}`,
       ja: `ライブレート · ${hh}:${mm}時点`,
       zh: `实时汇率 · 截至 ${hh}:${mm}`,
@@ -661,7 +661,7 @@ function rateStatusLabel(){
     const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
     const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
     const labelsCache = {
-      tr: `Baglanti yok · son kur: ${dd}.${mo} ${hh}:${mm}`,
+      tr: `Bağlantı yok · son kur: ${dd}.${mo} ${hh}:${mm}`,
       en: `Offline · last rate: ${dd}.${mo} ${hh}:${mm}`,
       ja: `オフライン · 最終レート: ${dd}.${mo} ${hh}:${mm}`,
       zh: `离线 · 最后汇率: ${dd}.${mo} ${hh}:${mm}`,
@@ -669,7 +669,7 @@ function rateStatusLabel(){
     return labelsCache[state.lang] || labelsCache.tr;
   }
   const labels2 = {
-    tr: `Sabit kur (baglanti yok) · ${RATE_DATE}`,
+    tr: `Sabit kur (bağlantı yok) · ${RATE_DATE}`,
     en: `Fixed rate (offline) · ${RATE_DATE}`,
     ja: `固定レート(オフライン) · ${RATE_DATE}`,
     zh: `固定汇率(离线) · ${RATE_DATE}`,
