@@ -586,7 +586,29 @@ const RATES_TO_EUR = {
 };
 
 let ratesLive = false;
+let ratesFromCache = false;
 let ratesLastUpdated = null;
+
+const RATES_CACHE_KEY = 'fiyatla_last_live_rates';
+
+function saveRatesToCache(){
+  try{
+    localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({
+      rates: RATES_TO_EUR,
+      timestamp: new Date().toISOString(),
+    }));
+  }catch(e){}
+}
+
+function loadRatesFromCache(){
+  try{
+    const raw = localStorage.getItem(RATES_CACHE_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){
+    return null;
+  }
+}
 
 async function fetchLiveRates(){
   try{
@@ -600,11 +622,23 @@ async function fetchLiveRates(){
       }
     }
     ratesLive = true;
+    ratesFromCache = false;
     ratesLastUpdated = new Date();
+    saveRatesToCache();
   }catch(e){
     ratesLive = false;
     window.lastRateError = e.message;
-    console.log('Canli kur alinamadi, sabit degerler kullaniliyor:', e.message);
+    const cached = loadRatesFromCache();
+    if(cached){
+      for(const code of Object.keys(cached.rates)){
+        RATES_TO_EUR[code] = cached.rates[code];
+      }
+      ratesFromCache = true;
+      ratesLastUpdated = new Date(cached.timestamp);
+    }else{
+      ratesFromCache = false;
+    }
+    console.log('Canli kur alinamadi:', e.message);
   }
   render();
 }
@@ -621,9 +655,21 @@ function rateStatusLabel(){
     };
     return labels[state.lang] || labels.tr;
   }
-  const errSuffix = window.lastRateError ? ` [${window.lastRateError}]` : '';
+  if(ratesFromCache && ratesLastUpdated){
+    const dd = String(ratesLastUpdated.getDate()).padStart(2,'0');
+    const mo = String(ratesLastUpdated.getMonth()+1).padStart(2,'0');
+    const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
+    const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
+    const labelsCache = {
+      tr: `Baglanti yok · son kur: ${dd}.${mo} ${hh}:${mm}`,
+      en: `Offline · last rate: ${dd}.${mo} ${hh}:${mm}`,
+      ja: `オフライン · 最終レート: ${dd}.${mo} ${hh}:${mm}`,
+      zh: `离线 · 最后汇率: ${dd}.${mo} ${hh}:${mm}`,
+    };
+    return labelsCache[state.lang] || labelsCache.tr;
+  }
   const labels2 = {
-    tr: `Sabit kur (baglanti yok)${errSuffix} · ${RATE_DATE}`,
+    tr: `Sabit kur (baglanti yok) · ${RATE_DATE}`,
     en: `Fixed rate (offline) · ${RATE_DATE}`,
     ja: `固定レート(オフライン) · ${RATE_DATE}`,
     zh: `固定汇率(离线) · ${RATE_DATE}`,
