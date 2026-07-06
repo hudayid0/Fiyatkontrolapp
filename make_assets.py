@@ -45,7 +45,7 @@ def make_splash(path, size=2732):
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", int(size*0.045))
     except:
         font = ImageFont.load_default()
-    text = "FIYAT KONTROL"
+    text = "FIYATLA"
     bbox = draw.textbbox((0,0), text, font=font)
     tw = bbox[2]-bbox[0]
     draw.text((cx - tw/2, cy + ring_r + int(size*0.05)), text, fill=TEXT, font=font)
