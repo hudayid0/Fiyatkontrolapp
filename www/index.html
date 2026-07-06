@@ -493,34 +493,56 @@
     cursor:pointer;
     box-shadow:0 6px 16px rgba(201,162,39,0.28);
   }
+  .lang-bar{
+    display:flex;
+    justify-content:flex-end;
+    gap:6px;
+    padding:14px 20px 0;
+  }
+  .lang-btn{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    font-size:16px;
+    padding:5px 9px;
+    cursor:pointer;
+    opacity:0.55;
+    transition:opacity .15s ease, border-color .15s ease;
+  }
+  .lang-btn.active{opacity:1; border-color:var(--gold);}
 </style>
 </head>
 <body>
 <div class="app" id="app"></div>
 
 <script>
-const CURRENCIES = [
-  {code:'TRY', label:'Türk Lirası (TRY)'},
-  {code:'USD', label:'ABD Doları (USD)'},
-  {code:'GBP', label:'İngiliz Sterlini (GBP)'},
-  {code:'EUR', label:'Euro (EUR)'},
-  {code:'JPY', label:'Japon Yeni (JPY)'},
-  {code:'CHF', label:'İsviçre Frangı (CHF)'},
-];
+const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY'];
 
-// Sabit kur verileri — ECB / piyasa referans kurlarına göre, 2 Temmuz 2026 itibarıyla.
-// Not: Bu değerler dondurulmuştur (canlı değildir); gerçek kur her an değişebilir.
+const CURRENCY_NAMES = {
+  TRY: {tr:'Türk Lirası', en:'Turkish Lira', ja:'トルコリラ', zh:'土耳其里拉'},
+  USD: {tr:'ABD Doları', en:'US Dollar', ja:'米ドル', zh:'美元'},
+  GBP: {tr:'İngiliz Sterlini', en:'British Pound', ja:'英ポンド', zh:'英镑'},
+  EUR: {tr:'Euro', en:'Euro', ja:'ユーロ', zh:'欧元'},
+  JPY: {tr:'Japon Yeni', en:'Japanese Yen', ja:'日本円', zh:'日元'},
+  CHF: {tr:'İsviçre Frangı', en:'Swiss Franc', ja:'スイスフラン', zh:'瑞士法郎'},
+  CNY: {tr:'Çin Yuanı', en:'Chinese Yuan', ja:'中国元', zh:'人民币'},
+};
+function ccyName(code){
+  const n = CURRENCY_NAMES[code];
+  return n ? (n[state.lang] || n.tr) : code;
+}
+
 const RATE_DATE = '2 Temmuz 2026';
 const RATES_TO_EUR = {
   EUR: 1,
-  USD: 0.8773,   // 1 USD = 0.8773 EUR
-  GBP: 1.1673,   // 1 GBP = 1.1673 EUR
-  JPY: 0.005403, // 1 JPY = 0.005403 EUR
-  CHF: 1.0870,   // 1 CHF = 1.0870 EUR
-  TRY: 0.018778, // 1 TRY = 0.018778 EUR
+  USD: 0.8773,
+  GBP: 1.1673,
+  JPY: 0.005403,
+  CHF: 1.0870,
+  TRY: 0.018778,
+  CNY: 0.1288,
 };
 
-// İki para birimi arasında EUR üzerinden çapraz kur hesabı
 function convertAmount(amount, fromCode, toCode){
   const eurValue = amount * RATES_TO_EUR[fromCode];
   return eurValue / RATES_TO_EUR[toCode];
@@ -529,7 +551,82 @@ function crossRate(fromCode, toCode){
   return RATES_TO_EUR[fromCode] / RATES_TO_EUR[toCode];
 }
 
-let state = { screen: 'home', stream: null, fromCcy: 'TRY', toCcy: 'EUR' };
+const LANG_TO_CCY = { tr:'TRY', en:'USD', ja:'JPY', zh:'CNY' };
+
+const TRANSLATIONS = {
+  eyebrowHome: {tr:'Kur & Fiyat Kontrol', en:'Currency & Price Check', ja:'為替・価格チェック', zh:'汇率与价格查询'},
+  homeTitle: {tr:'Yurtdışında ne kadar tutuyor?', en:'How much is it abroad?', ja:'海外ではいくら?', zh:'国外价格是多少?'},
+  homeSub: {tr:"Elindeki fiyatı anında Euro'ya çevir, ya da ürünü tarat, yurtdışı fiyatlarla karşılaştır.", en:'Convert your price to Euro instantly, or scan a product to compare foreign prices.', ja:'価格を即座にユーロに変換するか、商品をスキャンして海外価格と比較します。', zh:'立即将价格转换为欧元,或扫描商品与国外价格比较。'},
+  card1Num: {tr:'01 · HIZLI ÇEVİRİCİ', en:'01 · QUICK CONVERTER', ja:'01・クイック変換', zh:'01・快速换算'},
+  card1Title: {tr:'Fiyat gir, kuru gör', en:'Enter price, see rate', ja:'価格を入力', zh:'输入价格'},
+  card1Desc: {tr:'Bir tutar ve para birimi seç, anlık kur ile Euro karşılığını hesapla.', en:'Choose an amount and currency, calculate the Euro equivalent instantly.', ja:'金額と通貨を選択し、ユーロ換算を計算します。', zh:'选择金额和货币,计算欧元等值。'},
+  card2Num: {tr:'02 · ÜRÜN TARAMA', en:'02 · PRODUCT SCAN', ja:'02・商品スキャン', zh:'02・商品扫描'},
+  card2Title: {tr:'Barkodu tara, karşılaştır', en:'Scan barcode, compare', ja:'バーコードをスキャン', zh:'扫描条码'},
+  card2Desc: {tr:'Kamerayla barkodu oku, ürünü tanı ve yurtdışı fiyatlarıyla karşılaştır.', en:'Read the barcode with your camera and compare foreign prices.', ja:'カメラでバーコードを読み取り、海外価格と比較します。', zh:'用相机扫描条码并与国外价格比较。'},
+  card3Num: {tr:'03 · TAKİP LİSTEM', en:'03 · MY WATCHLIST', ja:'03・ウォッチリスト', zh:'03・我的关注列表'},
+  card3Title: {tr:'🔔 Fiyat hatırlatıcıları', en:'🔔 Price reminders', ja:'🔔 価格リマインダー', zh:'🔔 价格提醒'},
+  card3Desc: {tr:'Takip ettiğin ürünler için düzenli hatırlatma bildirimleri al.', en:'Get regular reminders for products you track.', ja:'追跡商品の定期リマインダーを受け取ります。', zh:'为您关注的商品接收定期提醒。'},
+  footerHome: {tr:"demo prototip · gerçek veriler kısmi olarak canlı API'lerden gelir", en:'demo prototype · some data comes from live APIs', ja:'デモ・一部データはライブAPIより', zh:'演示原型・部分数据来自实时API'},
+
+  back: {tr:'← Geri', en:'← Back', ja:'← 戻る', zh:'← 返回'},
+  convertEyebrow: {tr:'01 · Hızlı Çevirici', en:'01 · Quick Converter', ja:'01・クイック変換', zh:'01・快速换算'},
+  convertTitle: {tr:'Fiyat çevir', en:'Convert price', ja:'価格を変換', zh:'转换价格'},
+  amountLabel: {tr:'Tutar', en:'Amount', ja:'金額', zh:'金额'},
+  fromLabel: {tr:'Kimden', en:'From', ja:'から', zh:'从'},
+  toLabel: {tr:'Kime', en:'To', ja:'へ', zh:'到'},
+  convertBtn: {tr:'Çevir', en:'Convert', ja:'変換', zh:'转换'},
+  footerConvert: {tr:'Kurlar ECB referans verilerine göre sabitlenmiştir', en:'Rates fixed per ECB reference data', ja:'レートはECB基準で固定', zh:'汇率根据欧洲央行参考数据固定'},
+
+  scanEyebrow: {tr:'02 · Ürün Tarama', en:'02 · Product Scan', ja:'02・商品スキャン', zh:'02・商品扫描'},
+  scanTitle: {tr:'Ürünü bul', en:'Find the product', ja:'商品を検索', zh:'查找商品'},
+  scanSub: {tr:'Kamera izni ver, barkod numarasını gir ya da ürün adıyla ara.', en:'Grant camera access, enter a barcode, or search by name.', ja:'カメラ許可、バーコード入力、または名前で検索。', zh:'授予相机权限,输入条码,或按名称搜索。'},
+  camOpenBtn: {tr:'Kamerayı Aç', en:'Open Camera', ja:'カメラを開く', zh:'打开相机'},
+  orManual: {tr:'veya elle gir', en:'or enter manually', ja:'または手動入力', zh:'或手动输入'},
+  tabBarcode: {tr:'Barkod', en:'Barcode', ja:'バーコード', zh:'条码'},
+  tabName: {tr:'Ürün Adı', en:'Product Name', ja:'商品名', zh:'商品名称'},
+  findProductBtn: {tr:'Ürünü Bul', en:'Find Product', ja:'検索', zh:'查找商品'},
+  searchBtn: {tr:'Ara', en:'Search', ja:'検索', zh:'搜索'},
+  recentSearches: {tr:'Son aramalar', en:'Recent searches', ja:'最近の検索', zh:'最近搜索'},
+  footerScan: {tr:'Ürün verisi: Open Food Facts', en:'Product data: Open Food Facts', ja:'商品データ: Open Food Facts', zh:'商品数据: Open Food Facts'},
+
+  trackingEyebrow: {tr:'03 · Takip Listem', en:'03 · My Watchlist', ja:'03・ウォッチリスト', zh:'03・我的关注列表'},
+  trackingTitle: {tr:'🔔 Fiyat hatırlatıcıları', en:'🔔 Price reminders', ja:'🔔 価格リマインダー', zh:'🔔 价格提醒'},
+  trackingSub: {tr:'Takip ettiğin ürünler için düzenli aralıklarla hatırlatma bildirimi gönderilir.', en:'You get reminder notifications at regular intervals for tracked products.', ja:'追跡商品について定期的にリマインダー通知が送られます。', zh:'系统会定期为您关注的商品发送提醒通知。'},
+  trackEmpty: {tr:'Henüz takip ettiğin bir ürün yok.', en:'No tracked products yet.', ja:'まだ追跡中の商品はありません。', zh:'暂无关注的商品。'},
+  dropBtn: {tr:'Bırak', en:'Remove', ja:'削除', zh:'移除'},
+  footerTracking: {tr:'Bildirimler: Capacitor Local Notifications', en:'Notifications: Capacitor Local Notifications', ja:'通知: Capacitor Local Notifications', zh:'通知: Capacitor Local Notifications'},
+};
+
+function t(key){
+  const entry = TRANSLATIONS[key];
+  if(!entry) return key;
+  return entry[state.lang] || entry.tr;
+}
+
+function setLanguage(lang){
+  state.lang = lang;
+  try{ localStorage.setItem('fiyatla_lang', lang); }catch(e){}
+  const defaultCcy = LANG_TO_CCY[lang];
+  if(defaultCcy){
+    state.fromCcy = defaultCcy;
+    state.toCcy = defaultCcy === 'EUR' ? 'USD' : 'EUR';
+  }
+  render();
+}
+
+function renderLangBar(){
+  const langs = [
+    {code:'tr', flag:'🇹🇷'},
+    {code:'en', flag:'🇬🇧'},
+    {code:'ja', flag:'🇯🇵'},
+    {code:'zh', flag:'🇨🇳'},
+  ];
+  return `<div class="lang-bar">${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')">${l.flag}</button>`).join('')}</div>`;
+}
+
+let savedLang = 'tr';
+try{ savedLang = localStorage.getItem('fiyatla_lang') || 'tr'; }catch(e){}
+let state = { screen: 'home', stream: null, fromCcy: 'TRY', toCcy: 'EUR', lang: savedLang };
 
 function render(){
   const app = document.getElementById('app');
@@ -556,65 +653,65 @@ function renderTicker(){
 
 function renderHome(){
   return `
+    ${renderLangBar()}
     ${renderTicker()}
     <header class="top">
-      <p class="eyebrow">Kur & Fiyat Kontrol</p>
-      <h1>Yurtdışında ne kadar tutuyor?</h1>
-      <p class="sub">Elindeki fiyatı anında Euro'ya çevir, ya da ürünü tarat, yurtdışı fiyatlarla karşılaştır.</p>
+      <p class="eyebrow">${t('eyebrowHome')}</p>
+      <h1>${t('homeTitle')}</h1>
+      <p class="sub">${t('homeSub')}</p>
     </header>
     <main>
       <div class="card gold" onclick="goTo('convert')">
-        <span class="num">01 · HIZLI ÇEVİRİCİ</span>
-        <h2>Fiyat gir, kuru gör</h2>
-        <p>Bir tutar ve para birimi seç, anlık kur ile Euro karşılığını hesapla.</p>
+        <span class="num">${t('card1Num')}</span>
+        <h2>${t('card1Title')}</h2>
+        <p>${t('card1Desc')}</p>
       </div>
       <div class="card teal" onclick="goTo('scan')">
-        <span class="num">02 · ÜRÜN TARAMA</span>
-        <h2>Barkodu tara, karşılaştır</h2>
-        <p>Kamerayla barkodu oku, ürünü tanı ve yurtdışı fiyatlarıyla karşılaştır.</p>
+        <span class="num">${t('card2Num')}</span>
+        <h2>${t('card2Title')}</h2>
+        <p>${t('card2Desc')}</p>
       </div>
       <div class="card" onclick="goTo('tracking')" style="border-left:3px solid var(--gold-soft);">
-        <span class="num">03 · TAKİP LİSTEM</span>
-        <h2>🔔 Fiyat hatırlatıcıları</h2>
-        <p>Takip ettiğin ürünler için düzenli hatırlatma bildirimleri al.</p>
+        <span class="num">${t('card3Num')}</span>
+        <h2>${t('card3Title')}</h2>
+        <p>${t('card3Desc')}</p>
       </div>
     </main>
-    <footer>demo prototip · gerçek veriler kısmi olarak canlı API'lerden gelir</footer>
+    <footer>${t('footerHome')}</footer>
   `;
 }
 
 function renderConvert(){
   return `
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">← Geri</button>
-      <p class="eyebrow">01 · Hızlı Çevirici</p>
-      <h1>Fiyat çevir</h1>
-      <p class="sub">Sabit kur verisiyle iki yönlü hesaplama · kurlar ${RATE_DATE} itibarıyla dondurulmuştur.</p>
+      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
+      <p class="eyebrow">${t('convertEyebrow')}</p>
+      <h1>${t('convertTitle')}</h1>
     </header>
     <main>
       <div>
-        <label>Tutar</label>
-        <input type="number" id="amount" placeholder="Örn. 1500" inputmode="decimal" />
+        <label>${t('amountLabel')}</label>
+        <input type="number" id="amount" placeholder="1500" inputmode="decimal" />
       </div>
       <div class="row" style="align-items:end;">
         <div style="flex:1;">
-          <label>Kimden</label>
+          <label>${t('fromLabel')}</label>
           <select id="from-currency" onchange="onCurrencyChange()">
-            ${CURRENCIES.map(c=>`<option value="${c.code}" ${c.code===state.fromCcy?'selected':''}>${c.label}</option>`).join('')}
+            ${CURRENCIES.map(code=>`<option value="${code}" ${code===state.fromCcy?'selected':''}>${ccyName(code)} (${code})</option>`).join('')}
           </select>
         </div>
-        <button class="swap-btn" onclick="swapCurrencies()" title="Yönü değiştir">⇄</button>
+        <button class="swap-btn" onclick="swapCurrencies()">⇄</button>
         <div style="flex:1;">
-          <label>Kime</label>
+          <label>${t('toLabel')}</label>
           <select id="to-currency" onchange="onCurrencyChange()">
-            ${CURRENCIES.map(c=>`<option value="${c.code}" ${c.code===state.toCcy?'selected':''}>${c.label}</option>`).join('')}
+            ${CURRENCIES.map(code=>`<option value="${code}" ${code===state.toCcy?'selected':''}>${ccyName(code)} (${code})</option>`).join('')}
           </select>
         </div>
       </div>
-      <button class="primary" onclick="doConvert()">Çevir</button>
+      <button class="primary" onclick="doConvert()">${t('convertBtn')}</button>
       <div id="convert-result"></div>
     </main>
-    <footer>Kurlar ECB referans verilerine göre sabitlenmiştir · ${RATE_DATE}</footer>
+    <footer>${t('footerConvert')} · ${RATE_DATE}</footer>
   `;
 }
 
@@ -624,20 +721,20 @@ function renderScan(){
   return `
     <header class="top">
       <button class="backbtn" onclick="goTo('home')">← Geri</button>
-      <p class="eyebrow">02 · Ürün Tarama</p>
-      <h1>Ürünü bul</h1>
-      <p class="sub">Kamera izni ver, barkod numarasını gir ya da ürün adıyla ara.</p>
+      <p class="eyebrow">${t('scanEyebrow')}</p>
+      <h1>${t('scanTitle')}</h1>
+      <p class="sub">${t('scanSub')}</p>
     </header>
     <main>
       <div class="scan-box" id="scan-box">
         <p class="cam-msg" id="cam-msg">Kamerayı başlatmak için dokun</p>
       </div>
       <button class="primary teal-btn" id="cam-btn" onclick="startCamera()">Kamerayı Aç</button>
-      <div class="divider">veya elle gir</div>
+      <div class="divider">${t('orManual')}</div>
 
       <div class="tabs">
-        <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')">Barkod</button>
-        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')">Ürün Adı</button>
+        <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')">${t('tabBarcode')}</button>
+        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')">${t('tabName')}</button>
       </div>
 
       ${mode === 'barcode' ? `
@@ -659,14 +756,14 @@ function renderScan(){
 
       ${history.length ? `
         <div class="history-block">
-          <label>Son aramalar</label>
+          <label>${t('recentSearches')}</label>
           <div class="history-chips">
             ${history.map(h => `<button class="chip" onclick="rerunHistory('${h.mode}','${h.value.replace(/'/g,"\\'")}')">${h.value}</button>`).join('')}
           </div>
         </div>
       ` : ''}
     </main>
-    <footer>Ürün verisi: Open Food Facts · fiyat karşılaştırması örnek veridir</footer>
+    <footer>${t('footerScan')}</footer>
   `;
 }
 
@@ -968,9 +1065,9 @@ function renderTracking(){
   return `
     <header class="top">
       <button class="backbtn" onclick="goTo('home')">← Geri</button>
-      <p class="eyebrow">03 · Takip Listem</p>
-      <h1>🔔 Fiyat hatırlatıcıları</h1>
-      <p class="sub">Takip ettiğin ürünler için düzenli aralıklarla "tekrar kontrol et" bildirimi gönderilir.</p>
+      <p class="eyebrow">${t('trackingEyebrow')}</p>
+      <h1>${t('trackingTitle')}</h1>
+      <p class="sub">${t('trackingSub')}</p>
     </header>
     <main>
       ${tracked.length === 0 ? `
@@ -981,14 +1078,14 @@ function renderTracking(){
             <div class="pname">${item.name}</div>
             <div class="pbrand">${item.brand} · hedef fiyat: € ${item.targetPrice.toFixed(2)}</div>
           </div>
-          <button class="go-btn" onclick="untrackProduct('${item.id}')">Bırak</button>
+          <button class="go-btn" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
         </div>
       `).join('')}
       <div class="note">
         Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.
       </div>
     </main>
-    <footer>Bildirimler: Capacitor Local Notifications</footer>
+    <footer>${t('footerTracking')}</footer>
   `;
 }
 
