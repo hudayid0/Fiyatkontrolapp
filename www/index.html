@@ -603,6 +603,7 @@ async function fetchLiveRates(){
     ratesLastUpdated = new Date();
   }catch(e){
     ratesLive = false;
+    window.lastRateError = e.message;
     console.log('Canli kur alinamadi, sabit degerler kullaniliyor:', e.message);
   }
   render();
@@ -620,8 +621,9 @@ function rateStatusLabel(){
     };
     return labels[state.lang] || labels.tr;
   }
+  const errSuffix = window.lastRateError ? ` [${window.lastRateError}]` : '';
   const labels2 = {
-    tr: `Sabit kur (baglanti yok) · ${RATE_DATE}`,
+    tr: `Sabit kur (baglanti yok)${errSuffix} · ${RATE_DATE}`,
     en: `Fixed rate (offline) · ${RATE_DATE}`,
     ja: `固定レート(オフライン) · ${RATE_DATE}`,
     zh: `固定汇率(离线) · ${RATE_DATE}`,
