@@ -945,11 +945,7 @@ function goTo(screen){
   stopCamera();
   state.screen = screen;
   render();
-  if(screen === 'scan'){
-    showBannerAd();
-  }else{
-    hideBannerAd();
-  }
+  showBannerAd();
 }
 
 // ---- Screen 1: currency conversion (static/frozen rates, no network call) ----
@@ -1364,6 +1360,7 @@ async function initAdMob(){
       initializeForTesting: true,
     });
     admobReady = true;
+    showBannerAd();
   }catch(e){
     console.log('AdMob baslatilamadi:', e.message);
   }
