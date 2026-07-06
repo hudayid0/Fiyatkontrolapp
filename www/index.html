@@ -475,6 +475,7 @@ function render(){
   if(state.screen === 'home') app.innerHTML = renderHome();
   else if(state.screen === 'convert') app.innerHTML = renderConvert();
   else if(state.screen === 'scan') app.innerHTML = renderScan();
+  else if(state.screen === 'tracking') app.innerHTML = renderTracking();
   attachHandlers();
 }
 
@@ -510,6 +511,11 @@ function renderHome(){
         <span class="num">02 · ÜRÜN TARAMA</span>
         <h2>Barkodu tara, karşılaştır</h2>
         <p>Kamerayla barkodu oku, ürünü tanı ve yurtdışı fiyatlarıyla karşılaştır.</p>
+      </div>
+      <div class="card" onclick="goTo('tracking')" style="border-left:3px solid var(--gold-soft);">
+        <span class="num">03 · TAKİP LİSTEM</span>
+        <h2>🔔 Fiyat hatırlatıcıları</h2>
+        <p>Takip ettiğin ürünler için düzenli hatırlatma bildirimleri al.</p>
       </div>
     </main>
     <footer>demo prototip · gerçek veriler kısmi olarak canlı API'lerden gelir</footer>
@@ -816,7 +822,7 @@ async function searchByName(){
     `;
     state.lastSearchResults = products;
   }catch(err){
-    box.innerHTML = `<div class="error">Ürün adıyla arama şu an güvenilir çalışmıyor (Open Food Facts'in bu servisi beta aşamasında). En sağlam yol: yukarıdan "Barkod" sekmesine geçip kamerayla veya elle barkod ile aramak.</div>`;
+    box.innerHTML = `<div class="error">Arama başarısız: ${err.message}</div>`;
   }
 }
 
@@ -831,14 +837,17 @@ function renderProductResult(p, code){
   const brand = p.brands || '—';
   const img = p.image_front_small_url || p.image_url || '';
   const comparison = buildComparison(name, brand);
+  const safeName = name.replace(/'/g, "\\'");
+  const safeBrand = brand.replace(/'/g, "\\'");
   box.innerHTML = `
     <div class="product-card">
       ${img ? `<img src="${img}" alt="${name}">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2);"></div>`}
-      <div>
+      <div style="flex:1;">
         <div class="pname">${name}</div>
         <div class="pbrand">${brand} · barkod ${code}</div>
       </div>
     </div>
+    <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">🔔 Bu ürünü takip et</button>
     ${comparison}
   `;
 }
@@ -891,6 +900,108 @@ function buildComparison(name, brand){
     </table>
     <div class="note">Not: Bu karşılaştırma tablosu örnek (simüle) verilerle çalışıyor. Gerçek fiyatlar için resmi mağaza API'lerinin bağlanması gerekiyor — bu bir sonraki adım olabilir.</div>
   `;
+}
+
+function renderTracking(){
+  const tracked = getTrackedItems();
+  return `
+    <header class="top">
+      <button class="backbtn" onclick="goTo('home')">← Geri</button>
+      <p class="eyebrow">03 · Takip Listem</p>
+      <h1>🔔 Fiyat hatırlatıcıları</h1>
+      <p class="sub">Takip ettiğin ürünler için düzenli aralıklarla "tekrar kontrol et" bildirimi gönderilir.</p>
+    </header>
+    <main>
+      ${tracked.length === 0 ? `
+        <div class="note">Henüz takip ettiğin bir ürün yok. Bir ürün aradıktan sonra sonuç ekranındaki "🔔 Bu ürünü takip et" butonuna dokunarak ekleyebilirsin.</div>
+      ` : tracked.map(item => `
+        <div class="product-card">
+          <div style="flex:1;">
+            <div class="pname">${item.name}</div>
+            <div class="pbrand">${item.brand} · hedef fiyat: € ${item.targetPrice.toFixed(2)}</div>
+          </div>
+          <button class="go-btn" onclick="untrackProduct('${item.id}')">Bırak</button>
+        </div>
+      `).join('')}
+      <div class="note">
+        Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.
+      </div>
+    </main>
+    <footer>Bildirimler: Capacitor Local Notifications</footer>
+  `;
+}
+
+const TRACKING_KEY = 'fiyatla_tracked_items';
+
+function getTrackedItems(){
+  try{
+    return JSON.parse(localStorage.getItem(TRACKING_KEY) || '[]');
+  }catch(e){
+    return [];
+  }
+}
+
+function saveTrackedItems(items){
+  localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+}
+
+async function requestNotificationPermission(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.LocalNotifications){
+    return false;
+  }
+  try{
+    const current = await window.Capacitor.Plugins.LocalNotifications.checkPermissions();
+    if(current.display === 'granted') return true;
+    const req = await window.Capacitor.Plugins.LocalNotifications.requestPermissions();
+    return req.display === 'granted';
+  }catch(e){
+    return false;
+  }
+}
+
+async function trackProduct(name, brand, code, targetPrice){
+  const items = getTrackedItems();
+  const id = `${code}_${Date.now()}`;
+  items.push({ id, name, brand, code, targetPrice });
+  saveTrackedItems(items);
+
+  const granted = await requestNotificationPermission();
+  if(!granted){
+    alert('Ürün takip listesine eklendi. Bildirim izni verilmediği için hatırlatma gönderilemeyecek.');
+    return;
+  }
+
+  try{
+    await window.Capacitor.Plugins.LocalNotifications.schedule({
+      notifications: [{
+        id: Math.floor(Date.now() % 100000),
+        title: 'Fiyat Takibi — Fiyatla',
+        body: `${name} icin fiyatlari tekrar kontrol etme zamani geldi (hedefin: EUR${targetPrice.toFixed(2)})`,
+        schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
+      }]
+    });
+    alert(`"${name}" takip listesine eklendi. Her gun hatirlatma bildirimi alacaksin.`);
+  }catch(e){
+    alert('Urun takip listesine eklendi ama bildirim planlanamadi: ' + e.message);
+  }
+}
+
+async function untrackProduct(id){
+  let items = getTrackedItems();
+  items = items.filter(i => i.id !== id);
+  saveTrackedItems(items);
+  render();
+}
+
+function promptTrackProduct(name, brand, code){
+  const input = prompt(`"${name}" icin hedef fiyati gir (EUR):`, '5.00');
+  if(input === null) return;
+  const target = parseFloat(input.replace(',', '.'));
+  if(isNaN(target) || target <= 0){
+    alert('Gecerli bir fiyat gir.');
+    return;
+  }
+  trackProduct(name, brand, code, target);
 }
 
 render();
