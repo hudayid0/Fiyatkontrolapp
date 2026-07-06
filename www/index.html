@@ -1483,6 +1483,18 @@ async function hideBannerAd(){
 
 initAdMob();
 fetchLiveRates();
+setupBackButton();
+
+function setupBackButton(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('backButton', () => {
+    if(state.screen !== 'home'){
+      goTo('home');
+    }else{
+      window.Capacitor.Plugins.App.exitApp();
+    }
+  });
+}
 
 render();
 </script>
