@@ -585,6 +585,50 @@ const RATES_TO_EUR = {
   CNY: 0.1288,
 };
 
+let ratesLive = false;
+let ratesLastUpdated = null;
+
+async function fetchLiveRates(){
+  try{
+    const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY,CHF,TRY,CNY');
+    if(!res.ok) throw new Error('API hatasi');
+    const data = await res.json();
+    const rates = data.rates;
+    for(const code of Object.keys(rates)){
+      if(rates[code] > 0){
+        RATES_TO_EUR[code] = 1 / rates[code];
+      }
+    }
+    ratesLive = true;
+    ratesLastUpdated = new Date();
+  }catch(e){
+    ratesLive = false;
+    console.log('Canli kur alinamadi, sabit degerler kullaniliyor:', e.message);
+  }
+  render();
+}
+
+function rateStatusLabel(){
+  if(ratesLive && ratesLastUpdated){
+    const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
+    const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
+    const labels = {
+      tr: `Canli kur · saat ${hh}:${mm} itibariyla`,
+      en: `Live rate · as of ${hh}:${mm}`,
+      ja: `ライブレート · ${hh}:${mm}時点`,
+      zh: `实时汇率 · 截至 ${hh}:${mm}`,
+    };
+    return labels[state.lang] || labels.tr;
+  }
+  const labels2 = {
+    tr: `Sabit kur (baglanti yok) · ${RATE_DATE}`,
+    en: `Fixed rate (offline) · ${RATE_DATE}`,
+    ja: `固定レート(オフライン) · ${RATE_DATE}`,
+    zh: `固定汇率(离线) · ${RATE_DATE}`,
+  };
+  return labels2[state.lang] || labels2.tr;
+}
+
 function convertAmount(amount, fromCode, toCode){
   const eurValue = amount * RATES_TO_EUR[fromCode];
   return eurValue / RATES_TO_EUR[toCode];
@@ -831,7 +875,7 @@ function renderConvert(){
       <button class="primary" onclick="doConvert()">${t('convertBtn')}</button>
       <div id="convert-result"></div>
     </main>
-    <footer>${t('footerConvert')} · ${RATE_DATE}</footer>
+    <footer>${rateStatusLabel()}</footer>
   `;
 }
 
@@ -982,7 +1026,7 @@ function doConvert(){
     <div class="result">
       <div class="big">${converted.toFixed(2)} ${to}</div>
       <div class="small">${amount} ${from} · kur: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
-      <div class="small" style="margin-top:6px;">Sabit kur · ${RATE_DATE} itibarıyla</div>
+      <div class="small" style="margin-top:6px;">${rateStatusLabel()}</div>
     </div>
   `;
 }
@@ -1389,6 +1433,7 @@ async function hideBannerAd(){
 }
 
 initAdMob();
+fetchLiveRates();
 
 render();
 </script>
