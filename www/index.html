@@ -432,6 +432,67 @@
     font-size:11px;
     font-family:'IBM Plex Mono',monospace;
   }
+  .modal-overlay{
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(5,10,12,0.72);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:24px;
+  }
+  .modal-card{
+    background:linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    border:1px solid var(--line);
+    border-radius:22px;
+    padding:24px;
+    max-width:400px;
+    width:100%;
+    box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  }
+  .modal-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:19px;
+    margin:4px 0 8px;
+    font-weight:600;
+  }
+  .modal-sub{
+    font-size:13px;
+    color:var(--text-dim);
+    line-height:1.5;
+    margin:0 0 16px;
+  }
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+  }
+  .modal-btn-secondary{
+    flex:1;
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    border-radius:14px;
+    padding:13px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .modal-btn-primary{
+    flex:1;
+    background:linear-gradient(180deg, var(--gold-soft) 0%, var(--gold) 100%);
+    color:#1A1204;
+    border:none;
+    border-radius:14px;
+    padding:13px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    box-shadow:0 6px 16px rgba(201,162,39,0.28);
+  }
 </style>
 </head>
 <body>
@@ -994,13 +1055,40 @@ async function untrackProduct(id){
 }
 
 function promptTrackProduct(name, brand, code){
-  const input = prompt(`"${name}" icin hedef fiyati gir (EUR):`, '5.00');
-  if(input === null) return;
-  const target = parseFloat(input.replace(',', '.'));
+  const safeName2 = name.replace(/'/g, "\\'");
+  const safeBrand2 = brand.replace(/'/g, "\\'");
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'track-modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <p class="eyebrow">🔔 Fiyat Takibi</p>
+      <h3 class="modal-title">${name}</h3>
+      <p class="modal-sub">Hedef fiyatini gir (EUR) — bu fiyata ulasinca hatirlatma alirsin.</p>
+      <input type="number" id="target-price-input" value="5.00" step="0.01" inputmode="decimal" />
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="closeTrackModal()">Vazgec</button>
+        <button class="modal-btn-primary" onclick="confirmTrackProduct('${safeName2}','${safeBrand2}','${code}')">Takip Et</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('target-price-input').focus(), 50);
+}
+
+function closeTrackModal(){
+  const overlay = document.getElementById('track-modal-overlay');
+  if(overlay) overlay.remove();
+}
+
+function confirmTrackProduct(name, brand, code){
+  const input = document.getElementById('target-price-input');
+  const target = parseFloat(input.value.replace(',', '.'));
   if(isNaN(target) || target <= 0){
-    alert('Gecerli bir fiyat gir.');
+    input.style.borderColor = 'var(--danger)';
     return;
   }
+  closeTrackModal();
   trackProduct(name, brand, code, target);
 }
 
