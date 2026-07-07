@@ -791,7 +791,7 @@ const TRANSLATIONS = {
   card2Desc: {tr:'Kamerayla barkodu oku, ürünü tanı ve yurtdışı fiyatlarıyla karşılaştır.', en:'Read the barcode with your camera and compare foreign prices.', ja:'カメラでバーコードを読み取り、海外価格と比較します。', zh:'用相机扫描条码并与国外价格比较。'},
   card3Num: {tr:'03 · TAKİP LİSTEM', en:'03 · MY WATCHLIST', ja:'03・ウォッチリスト', zh:'03・我的关注列表'},
   card3Title: {tr:'🔔 Fiyat hatırlatıcıları', en:'🔔 Price reminders', ja:'🔔 価格リマインダー', zh:'🔔 价格提醒'},
-  card3Desc: {tr:'Takip ettiğin ürünler için düzenli hatırlatma bildirimleri al.', en:'Get regular reminders for products you track.', ja:'追跡商品の定期リマインダーを受け取ります。', zh:'为您关注的商品接收定期提醒。'},
+  card3Desc: {tr:"Takip ettiğin ürünler için günlük 'tekrar kontrol et' hatırlatması al.", en:"Get a daily 'check again' reminder for products you track.", ja:'追跡商品について毎日「再確認」リマインダーを受け取ります。', zh:'为您关注的商品每天接收"重新检查"提醒。'},
   footerHome: {tr:"demo prototip · gerçek veriler kısmi olarak canlı API'lerden gelir", en:'demo prototype · some data comes from live APIs', ja:'デモ・一部データはライブAPIより', zh:'演示原型・部分数据来自实时API'},
 
   back: {tr:'← Geri', en:'← Back', ja:'← 戻る', zh:'← 返回'},
@@ -853,6 +853,9 @@ const TRANSLATIONS = {
   searchingWiderDb: {tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
   invalidBarcodeChecksum: {tr:'Bu barkod numarası geçersiz görünüyor (kontrol basamağı tutmuyor). Numarayı kontrol et.', en:'This barcode number appears invalid (checksum mismatch). Please check the number.', ja:'このバーコード番号は無効のようです(チェックデジットが一致しません)。番号を確認してください。', zh:'此条码号似乎无效(校验位不匹配)。请检查号码。'},
   editBtn: {tr:'Düzenle', en:'Edit', ja:'編集', zh:'编辑'},
+  experimentalTag: {tr:'deneysel', en:'experimental', ja:'実験的', zh:'实验性'},
+  sourceOff: {tr:'Kaynak: Open Food Facts', en:'Source: Open Food Facts', ja:'情報源: Open Food Facts', zh:'来源: Open Food Facts'},
+  sourceUpc: {tr:'Kaynak: UPCitemdb (topluluk verisi, doğrulanmamış)', en:'Source: UPCitemdb (community data, unverified)', ja:'情報源: UPCitemdb(コミュニティデータ、未検証)', zh:'来源: UPCitemdb(社区数据,未经验证)'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1077,7 +1080,7 @@ function renderConvert(){
     <main>
       <div>
         <label>${t('amountLabel')}</label>
-        <input type="number" id="amount" placeholder="1500" inputmode="decimal" />
+        <input type="number" id="amount" placeholder="1500" inputmode="decimal" value="${state.lastAmount || ''}" oninput="state.lastAmount = this.value" />
       </div>
       <div class="row" style="align-items:end;">
         <div style="flex:1;">
@@ -1124,7 +1127,7 @@ function renderScan(){
 
       <div class="tabs">
         <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')">${t('tabBarcode')}</button>
-        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')">${t('tabName')}</button>
+        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')">${t('tabName')} <span style="font-size:9px; opacity:0.65;">(${t('experimentalTag')})</span></button>
       </div>
 
       <div class="tab-content-anim">
@@ -1161,7 +1164,10 @@ function renderScan(){
 
 function attachHandlers(){
   const inp = document.getElementById('amount');
-  if(inp) inp.addEventListener('keydown', e=>{ if(e.key==='Enter') doConvert(); });
+  if(inp){
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') doConvert(); });
+    if(state.lastAmount) doConvert();
+  }
 
   const bc = document.getElementById('barcode');
   if(bc){
@@ -1513,6 +1519,7 @@ function renderProductResult(p, code){
       <div style="flex:1;">
         <div class="pname">${name}</div>
         <div class="pbrand">${brand} · barkod ${code}</div>
+        <div class="pbrand" style="opacity:0.7; margin-top:2px;">${p._source === 'upcitemdb' ? t('sourceUpc') : t('sourceOff')}</div>
       </div>
     </div>
     <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">🔔 Bu ürünü takip et</button>
