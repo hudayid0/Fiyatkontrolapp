@@ -1022,7 +1022,7 @@ function renderHome(){
         <p>${t('card3Desc')}</p>
       </div>
     </main>
-    <footer>${t('footerHome')}</footer>
+    <footer>${t('footerHome')}<br><span style="font-size:9px;">${window.adDebugInfo || 'debug yok'}</span></footer>
   `;
 }
 
@@ -1625,14 +1625,20 @@ function toggleAds(){
 }
 
 function setupAdSizeListener(){
+  window.adDebugInfo = 'listener kurulmadi (AdMob yok)';
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  window.adDebugInfo = 'listener kuruldu, olay bekleniyor';
   try{
     window.Capacitor.Plugins.AdMob.addListener('bannerAdSizeChanged', (info) => {
+      window.adDebugInfo = 'olay geldi: ' + JSON.stringify(info);
       if(info && info.height){
         document.documentElement.style.setProperty('--ad-height', (info.height + 6) + 'px');
       }
+      render();
     });
-  }catch(e){}
+  }catch(e){
+    window.adDebugInfo = 'hata: ' + e.message;
+  }
 }
 
 async function showBannerAd(){
