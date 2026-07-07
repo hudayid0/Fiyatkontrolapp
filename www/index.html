@@ -591,6 +591,24 @@
     padding:5px 9px;
     cursor:pointer;
   }
+  .ad-close-wrap{
+    position:fixed;
+    top:4px;
+    right:8px;
+    z-index:1500;
+  }
+  .ad-close-btn{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    width:28px;
+    height:28px;
+    border-radius:50%;
+    font-size:14px;
+    line-height:1;
+    cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
 </style>
 </head>
 <body>
@@ -729,10 +747,10 @@ const LANG_TO_CCY = { tr:'TRY', en:'USD', ja:'JPY', zh:'CNY' };
 const TRANSLATIONS = {
   eyebrowHome: {tr:'Kur & Fiyat Kontrol', en:'Currency & Price Check', ja:'為替・価格チェック', zh:'汇率与价格查询'},
   homeTitle: {tr:'Yurtdışında ne kadar tutuyor?', en:'How much is it abroad?', ja:'海外ではいくら?', zh:'国外价格是多少?'},
-  homeSub: {tr:"Elindeki fiyatı anında Euro'ya çevir, ya da ürünü tarat, yurtdışı fiyatlarla karşılaştır.", en:'Convert your price to Euro instantly, or scan a product to compare foreign prices.', ja:'価格を即座にユーロに変換するか、商品をスキャンして海外価格と比較します。', zh:'立即将价格转换为欧元,或扫描商品与国外价格比较。'},
+  homeSub: {tr:'Elindeki fiyatı istediğin para birimine anında çevir, ya da ürünü tarat, yurtdışı fiyatlarla karşılaştır.', en:'Instantly convert your price to any currency, or scan a product to compare foreign prices.', ja:'価格を好きな通貨に即座に変換するか、商品をスキャンして海外価格と比較します。', zh:'立即将价格转换为任意货币,或扫描商品与国外价格比较。'},
   card1Num: {tr:'01 · HIZLI ÇEVİRİCİ', en:'01 · QUICK CONVERTER', ja:'01・クイック変換', zh:'01・快速换算'},
   card1Title: {tr:'Fiyat gir, kuru gör', en:'Enter price, see rate', ja:'価格を入力', zh:'输入价格'},
-  card1Desc: {tr:'Bir tutar ve para birimi seç, anlık kur ile Euro karşılığını hesapla.', en:'Choose an amount and currency, calculate the Euro equivalent instantly.', ja:'金額と通貨を選択し、ユーロ換算を計算します。', zh:'选择金额和货币,计算欧元等值。'},
+  card1Desc: {tr:'Bir tutar ve iki para birimi seç, anlık kur ile karşılığını hesapla.', en:'Choose an amount and two currencies, calculate the live conversion instantly.', ja:'金額と2つの通貨を選択し、即座に換算します。', zh:'选择金额和两种货币,即时计算换算结果。'},
   card2Num: {tr:'02 · ÜRÜN TARAMA', en:'02 · PRODUCT SCAN', ja:'02・商品スキャン', zh:'02・商品扫描'},
   card2Title: {tr:'Barkodu tara, karşılaştır', en:'Scan barcode, compare', ja:'バーコードをスキャン', zh:'扫描条码'},
   card2Desc: {tr:'Kamerayla barkodu oku, ürünü tanı ve yurtdışı fiyatlarıyla karşılaştır.', en:'Read the barcode with your camera and compare foreign prices.', ja:'カメラでバーコードを読み取り、海外価格と比較します。', zh:'用相机扫描条码并与国外价格比较。'},
@@ -935,9 +953,25 @@ if(window.matchMedia){
   }catch(e){}
 }
 
+function renderAdCloseButton(){
+  let el = document.getElementById('ad-close-wrap');
+  if(!adsEnabled){
+    if(el) el.remove();
+    return;
+  }
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'ad-close-wrap';
+    el.className = 'ad-close-wrap';
+    el.innerHTML = '<button class="ad-close-btn" onclick="toggleAds()">✕</button>';
+    document.body.appendChild(el);
+  }
+}
+
 function render(){
   const app = document.getElementById('app');
   applyTheme();
+  renderAdCloseButton();
   if(state.screen === 'home') app.innerHTML = renderHome();
   else if(state.screen === 'convert') app.innerHTML = renderConvert();
   else if(state.screen === 'scan') app.innerHTML = renderScan();
@@ -985,9 +1019,6 @@ function renderHome(){
         <p>${t('card3Desc')}</p>
       </div>
     </main>
-    <div style="text-align:center; padding:0 20px 8px;">
-      <button class="chip" onclick="toggleAds()">${adsEnabled ? '🔔' : '🔕'} Reklamlar: ${adsEnabled ? 'Açık' : 'Kapalı'}</button>
-    </div>
     <footer>${t('footerHome')}</footer>
   `;
 }
