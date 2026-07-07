@@ -975,7 +975,6 @@ function renderAdCloseButton(){
 function render(){
   const app = document.getElementById('app');
   applyTheme();
-  renderAdCloseButton();
   if(state.screen === 'home') app.innerHTML = renderHome();
   else if(state.screen === 'convert') app.innerHTML = renderConvert();
   else if(state.screen === 'scan') app.innerHTML = renderScan();
