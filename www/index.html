@@ -853,9 +853,14 @@ const TRANSLATIONS = {
   searchingWiderDb: {tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
   invalidBarcodeChecksum: {tr:'Bu barkod numarası geçersiz görünüyor (kontrol basamağı tutmuyor). Numarayı kontrol et.', en:'This barcode number appears invalid (checksum mismatch). Please check the number.', ja:'このバーコード番号は無効のようです(チェックデジットが一致しません)。番号を確認してください。', zh:'此条码号似乎无效(校验位不匹配)。请检查号码。'},
   editBtn: {tr:'Düzenle', en:'Edit', ja:'編集', zh:'编辑'},
-  experimentalTag: {tr:'deneysel', en:'experimental', ja:'実験的', zh:'实验性'},
+  experimentalTag: {tr:'Beta', en:'Beta', ja:'Beta', zh:'Beta'},
   sourceOff: {tr:'Kaynak: Open Food Facts', en:'Source: Open Food Facts', ja:'情報源: Open Food Facts', zh:'来源: Open Food Facts'},
   sourceUpc: {tr:'Kaynak: UPCitemdb (topluluk verisi, doğrulanmamış)', en:'Source: UPCitemdb (community data, unverified)', ja:'情報源: UPCitemdb(コミュニティデータ、未検証)', zh:'来源: UPCitemdb(社区数据,未经验证)'},
+  rateTitle: {tr:'Fiyatla\'yı beğendin mi?', en:'Enjoying Fiyatla?', ja:'Fiyatlaを気に入りましたか?', zh:'喜欢Fiyatla吗?'},
+  rateMessage: {tr:'Play Store\'da bize 5 yıldız verirsen çok mutlu oluruz — bu, uygulamanın daha fazla kişiye ulaşmasına yardımcı olur.', en:'We would love a 5-star rating on the Play Store — it helps the app reach more people.', ja:'Playストアで5つ星評価をいただけると嬉しいです。より多くの人に届く助けになります。', zh:'如果您能在Play商店给我们5星评价,我们将非常感激——这有助于让更多人发现这个应用。'},
+  rateNowBtn: {tr:'Değerlendir', en:'Rate now', ja:'評価する', zh:'立即评价'},
+  rateLaterBtn: {tr:'Daha sonra', en:'Maybe later', ja:'後で', zh:'稍后'},
+  rateNeverBtn: {tr:'Bir daha sorma', en:"Don't ask again", ja:'今後表示しない', zh:'不再询问'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1316,6 +1321,68 @@ function resetCamBox(){
 }
 
 // ---- Product lookup (Open Food Facts - real API) ----
+function getAppOpenCount(){
+  let count = 1;
+  try{
+    count = parseInt(localStorage.getItem('fiyatla_open_count') || '0', 10) + 1;
+    localStorage.setItem('fiyatla_open_count', String(count));
+  }catch(e){}
+  return count;
+}
+
+function maybeShowRatePrompt(openCount){
+  try{
+    const status = localStorage.getItem('fiyatla_rate_status');
+    if(status === 'rated' || status === 'never') return;
+    if(openCount < 5) return;
+    const laterCount = parseInt(localStorage.getItem('fiyatla_rate_later_count') || '0', 10);
+    if(laterCount && openCount < laterCount + 10) return;
+    showRateModal();
+  }catch(e){}
+}
+
+function showRateModal(){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'rate-modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <p class="eyebrow">⭐ ${t('rateTitle')}</p>
+      <p class="modal-sub">${t('rateMessage')}</p>
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="rateLater()">${t('rateLaterBtn')}</button>
+        <button class="modal-btn-primary" onclick="rateNow()">${t('rateNowBtn')}</button>
+      </div>
+      <button class="chip" style="margin-top:12px; width:100%; text-align:center;" onclick="rateNever()">${t('rateNeverBtn')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeRateModal(){
+  const el = document.getElementById('rate-modal-overlay');
+  if(el) el.remove();
+}
+
+function rateNow(){
+  try{ localStorage.setItem('fiyatla_rate_status', 'rated'); }catch(e){}
+  closeRateModal();
+  window.open('https://play.google.com/store/apps/details?id=com.hudayi.fiyatkontrol', '_system');
+}
+
+function rateLater(){
+  try{
+    const count = parseInt(localStorage.getItem('fiyatla_open_count') || '0', 10);
+    localStorage.setItem('fiyatla_rate_later_count', String(count));
+  }catch(e){}
+  closeRateModal();
+}
+
+function rateNever(){
+  try{ localStorage.setItem('fiyatla_rate_status', 'never'); }catch(e){}
+  closeRateModal();
+}
+
 function editTrackedItem(id){
   const items = getTrackedItems();
   const item = items.find(i => i.id === id);
@@ -1780,7 +1847,7 @@ async function initAdMob(){
     admobReady = true;
     setupAdSizeListener();
     showBannerAd();
-    showInterstitialOnce();
+    if(shouldShowInterstitial()) showInterstitialOnce();
   }catch(e){
     console.log('AdMob baslatilamadi:', e.message);
   }
@@ -1866,9 +1933,23 @@ async function handleGalleryImage(event){
   event.target.value = '';
 }
 
+function shouldShowInterstitial(){
+  try{
+    const last = parseInt(localStorage.getItem('fiyatla_last_interstitial') || '0', 10);
+    const now = Date.now();
+    if(now - last < 10 * 60 * 1000) return false;
+    localStorage.setItem('fiyatla_last_interstitial', String(now));
+    return true;
+  }catch(e){
+    return true;
+  }
+}
+
+window.fiyatlaOpenCount = getAppOpenCount();
 initAdMob();
 fetchLiveRates();
 setupBackButton();
+setTimeout(() => maybeShowRatePrompt(window.fiyatlaOpenCount), 2500);
 
 let lastBackPress = 0;
 
