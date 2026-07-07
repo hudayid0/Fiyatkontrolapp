@@ -850,6 +850,7 @@ const TRANSLATIONS = {
   galleryBtn: {tr:'Galeriden Seç', en:'Choose from Gallery', ja:'ギャラリーから選択', zh:'从相册选择'},
   galleryNoBarcode: {tr:'Görselde barkod bulunamadı. Farklı bir fotoğraf dene ya da elle gir.', en:'No barcode found in the image. Try another photo or enter manually.', ja:'画像にバーコードが見つかりませんでした。別の写真を試すか手動で入力してください。', zh:'图片中未找到条码。请尝试其他照片或手动输入。'},
   galleryUnsupported: {tr:'Bu cihaz görselden barkod okumayı desteklemiyor.', en:'This device does not support scanning barcodes from images.', ja:'このデバイスは画像からのバーコード読み取りに対応していません。', zh:'此设备不支持从图片扫描条码。'},
+  searchingWiderDb: {tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1307,6 +1308,25 @@ function resetCamBox(){
 }
 
 // ---- Product lookup (Open Food Facts - real API) ----
+async function tryUpcItemDb(code){
+  try{
+    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+    if(!res.ok) return false;
+    const data = await res.json();
+    if(!data.items || data.items.length === 0) return false;
+    const item = data.items[0];
+    const normalized = {
+      product_name: item.title || item.model || 'Bilinmeyen urun',
+      brands: item.brand || '-',
+      image_front_small_url: (item.images && item.images[0]) || '',
+    };
+    renderProductResult(normalized, code);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
 async function lookupBarcode(){
   const code = document.getElementById('barcode').value.trim();
   const box = document.getElementById('scan-result');
@@ -1324,9 +1344,11 @@ async function lookupBarcode(){
     const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
     const data = await res.json();
     if(data.status !== 1){
-      box.innerHTML = `
-        <div class="error">${t('barcodeNotFoundMsg')}</div>
-      `;
+      box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingWiderDb')}</div>`;
+      const found = await tryUpcItemDb(code);
+      if(!found){
+        box.innerHTML = `<div class="error">${t('barcodeNotFoundMsg')}</div>`;
+      }
       return;
     }
     renderProductResult(data.product, code);
