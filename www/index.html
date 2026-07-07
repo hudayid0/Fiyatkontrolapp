@@ -851,6 +851,8 @@ const TRANSLATIONS = {
   galleryNoBarcode: {tr:'Görselde barkod bulunamadı. Farklı bir fotoğraf dene ya da elle gir.', en:'No barcode found in the image. Try another photo or enter manually.', ja:'画像にバーコードが見つかりませんでした。別の写真を試すか手動で入力してください。', zh:'图片中未找到条码。请尝试其他照片或手动输入。'},
   galleryUnsupported: {tr:'Bu cihaz görselden barkod okumayı desteklemiyor.', en:'This device does not support scanning barcodes from images.', ja:'このデバイスは画像からのバーコード読み取りに対応していません。', zh:'此设备不支持从图片扫描条码。'},
   searchingWiderDb: {tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
+  invalidBarcodeChecksum: {tr:'Bu barkod numarası geçersiz görünüyor (kontrol basamağı tutmuyor). Numarayı kontrol et.', en:'This barcode number appears invalid (checksum mismatch). Please check the number.', ja:'このバーコード番号は無効のようです(チェックデジットが一致しません)。番号を確認してください。', zh:'此条码号似乎无效(校验位不匹配)。请检查号码。'},
+  editBtn: {tr:'Düzenle', en:'Edit', ja:'編集', zh:'编辑'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1308,6 +1310,73 @@ function resetCamBox(){
 }
 
 // ---- Product lookup (Open Food Facts - real API) ----
+function editTrackedItem(id){
+  const items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'track-modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <p class="eyebrow">${t('trackModalEyebrow')}</p>
+      <h3 class="modal-title">${item.name}</h3>
+      <p class="modal-sub">${t('trackModalSub')}</p>
+      <input type="number" id="target-price-input" value="${item.targetPrice.toFixed(2)}" step="0.01" inputmode="decimal" />
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
+        <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${id}')">${t('trackConfirm')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => { const el = document.getElementById('target-price-input'); if(el) el.focus(); }, 50);
+}
+
+async function confirmEditTrackedItem(id){
+  const input = document.getElementById('target-price-input');
+  const target = parseFloat(input.value.replace(',', '.'));
+  if(isNaN(target) || target <= 0){
+    input.style.borderColor = 'var(--danger)';
+    return;
+  }
+  closeTrackModal();
+  const items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  item.targetPrice = target;
+  saveTrackedItems(items);
+
+  const granted = await requestNotificationPermission();
+  if(granted && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
+    try{
+      await window.Capacitor.Plugins.LocalNotifications.schedule({
+        notifications: [{
+          id: Math.floor(Date.now() % 100000),
+          title: 'Fiyat Takibi - Fiyatla',
+          body: `${item.name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${target.toFixed(2)})`,
+          schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
+        }]
+      });
+    }catch(e){}
+  }
+  render();
+}
+
+function isValidBarcodeChecksum(code){
+  const digits = code.split('').map(Number);
+  const n = digits.length;
+  const checkDigit = digits[n-1];
+  let sum = 0;
+  let weight = 3;
+  for(let i = n-2; i >= 0; i--){
+    sum += digits[i] * weight;
+    weight = weight === 3 ? 1 : 3;
+  }
+  const calculated = (10 - (sum % 10)) % 10;
+  return calculated === checkDigit;
+}
+
 const PRODUCT_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 function getCachedProduct(code){
@@ -1356,6 +1425,10 @@ async function lookupBarcode(){
   }
   if(![8,12,13,14].includes(code.length)){
     box.innerHTML = `<div class="error">${td('invalidBarcodeFormat', code.length)}</div>`;
+    return;
+  }
+  if(!isValidBarcodeChecksum(code)){
+    box.innerHTML = `<div class="error">${t('invalidBarcodeChecksum')}</div>`;
     return;
   }
   addToHistory('barcode', code);
@@ -1550,6 +1623,7 @@ function renderTracking(){
             <div class="pname">${item.name}</div>
             <div class="pbrand">${item.brand} · hedef fiyat: € ${item.targetPrice.toFixed(2)}</div>
           </div>
+          <button class="go-btn" onclick="editTrackedItem('${item.id}')">${t('editBtn')}</button>
           <button class="go-btn" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
         </div>
       `).join('')}
