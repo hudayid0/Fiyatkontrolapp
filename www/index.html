@@ -570,6 +570,26 @@
     transition:opacity .2s ease;
   }
   .toast.show{opacity:1;}
+  .app.light-theme{
+    --bg:#FAF8F4;
+    --surface:#FFFFFF;
+    --surface-2:#F0ECE2;
+    --line:#DEDACE;
+    --gold:#A8841D;
+    --gold-soft:#7A5F14;
+    --teal:#0D8F82;
+    --text:#1C2422;
+    --text-dim:#6B7570;
+    --danger:#C0392B;
+  }
+  .theme-btn{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    font-size:16px;
+    padding:5px 9px;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -851,15 +871,72 @@ function renderLangBar(){
     {code:'ja', flag:'🇯🇵'},
     {code:'zh', flag:'🇨🇳'},
   ];
-  return `<div class="lang-bar">${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')">${l.flag}</button>`).join('')}</div>`;
+  return `<div class="lang-bar">
+    <button class="theme-btn" onclick="cycleTheme()">${themeIcon()}</button>
+    ${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')">${l.flag}</button>`).join('')}
+  </div>`;
 }
 
 let savedLang = 'tr';
 try{ savedLang = localStorage.getItem('fiyatla_lang') || 'tr'; }catch(e){}
-let state = { screen: 'home', stream: null, fromCcy: 'TRY', toCcy: 'EUR', lang: savedLang };
+let savedThemeOverride = null;
+try{ savedThemeOverride = localStorage.getItem('fiyatla_theme_override') || null; }catch(e){}
+
+let state = { screen: 'home', stream: null, fromCcy: 'TRY', toCcy: 'EUR', lang: savedLang, themeOverride: savedThemeOverride };
+
+function systemPrefersDark(){
+  try{
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }catch(e){
+    return true;
+  }
+}
+
+function resolvedTheme(){
+  return state.themeOverride || (systemPrefersDark() ? 'dark' : 'light');
+}
+
+function applyTheme(){
+  const app = document.getElementById('app');
+  if(!app) return;
+  if(resolvedTheme() === 'light'){
+    app.classList.add('light-theme');
+  }else{
+    app.classList.remove('light-theme');
+  }
+}
+
+function cycleTheme(){
+  const current = state.themeOverride;
+  let next;
+  if(current === null) next = 'light';
+  else if(current === 'light') next = 'dark';
+  else next = null;
+  state.themeOverride = next;
+  try{
+    if(next) localStorage.setItem('fiyatla_theme_override', next);
+    else localStorage.removeItem('fiyatla_theme_override');
+  }catch(e){}
+  render();
+}
+
+function themeIcon(){
+  if(state.themeOverride === 'light') return '☀️';
+  if(state.themeOverride === 'dark') return '🌙';
+  return '🖥️';
+}
+
+if(window.matchMedia){
+  try{
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if(state.themeOverride === null) render();
+    });
+  }catch(e){}
+}
 
 function render(){
   const app = document.getElementById('app');
+  applyTheme();
   if(state.screen === 'home') app.innerHTML = renderHome();
   else if(state.screen === 'convert') app.innerHTML = renderConvert();
   else if(state.screen === 'scan') app.innerHTML = renderScan();
