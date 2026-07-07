@@ -1632,7 +1632,7 @@ function setupAdSizeListener(){
     window.Capacitor.Plugins.AdMob.addListener('bannerAdSizeChanged', (info) => {
       window.adDebugInfo = 'olay geldi: ' + JSON.stringify(info);
       if(info && info.height){
-        document.documentElement.style.setProperty('--ad-height', info.height + 'px');
+        document.documentElement.style.setProperty('--ad-height', Math.max(info.height - 6, 0) + 'px');
       }
       render();
     });
