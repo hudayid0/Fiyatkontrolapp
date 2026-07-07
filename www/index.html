@@ -1383,7 +1383,7 @@ async function searchByName(){
             ${p.image_front_small_url ? `<img src="${p.image_front_small_url}">` : `<div style="width:44px;height:44px;border-radius:7px;background:var(--surface-2);"></div>`}
             <div>
               <div class="rname">${p.product_name}</div>
-              <div class="rbrand">${p.brands || '—'} · ${p.code}</div>
+              <div class="rbrand">${p.brands || '-'} - ${p.code}</div>
             </div>
           </button>
         `).join('')}
@@ -1391,7 +1391,7 @@ async function searchByName(){
     `;
     state.lastSearchResults = products;
   }catch(err){
-    box.innerHTML = `<div class="error">Arama başarısız: ${err.message}</div>`;
+    box.innerHTML = `<div class="error">${t('nameSearchUnstable')}</div>`;
   }
 }
 
