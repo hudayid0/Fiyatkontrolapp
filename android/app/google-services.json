@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "589810693120",
+    "project_id": "fiyatla-376e9",
+    "storage_bucket": "fiyatla-376e9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:589810693120:android:62a64f93df4bdfb92514e5",
+        "android_client_info": {
+          "package_name": "com.hudayi.fiyatkontrol"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDH_oeYiUOCSGJj8rcwvqEQpHSE2tArHlM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
