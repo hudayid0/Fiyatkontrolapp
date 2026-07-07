@@ -36,7 +36,7 @@
     flex-direction:column;
     position:relative;
     overflow:hidden;
-    padding-top:var(--ad-height, 64px);
+    padding-top:calc(env(safe-area-inset-top, 24px) + var(--ad-height, 64px));
   }
 
   /* Ticker tape - signature element */
