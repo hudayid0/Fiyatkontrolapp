@@ -1543,6 +1543,27 @@ function confirmTrackProduct(name, brand, code){
 const ADMOB_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111';
 let admobReady = false;
 
+const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-3940256099942544/1033173712';
+
+async function showInterstitialOnce(){
+  if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    await window.Capacitor.Plugins.AdMob.prepareInterstitial({
+      adId: ADMOB_INTERSTITIAL_ID,
+      isTesting: true,
+    });
+    setTimeout(async () => {
+      try{
+        await window.Capacitor.Plugins.AdMob.showInterstitial();
+      }catch(e){
+        console.log('Interstitial gosterilemedi:', e.message);
+      }
+    }, 1500);
+  }catch(e){
+    console.log('Interstitial hazirlanamadi:', e.message);
+  }
+}
+
 async function initAdMob(){
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
   try{
@@ -1552,6 +1573,7 @@ async function initAdMob(){
     });
     admobReady = true;
     showBannerAd();
+    showInterstitialOnce();
   }catch(e){
     console.log('AdMob baslatilamadi:', e.message);
   }
