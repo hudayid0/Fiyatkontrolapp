@@ -611,6 +611,37 @@
     align-items:center;
     gap:4px;
   }
+  @keyframes screenFadeIn{
+    from{ opacity:0; transform:translateY(10px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .screen-anim{
+    animation:screenFadeIn 0.28s ease;
+  }
+  @keyframes modalFadeIn{
+    from{ opacity:0; }
+    to{ opacity:1; }
+  }
+  @keyframes modalCardIn{
+    from{ opacity:0; transform:scale(0.92) translateY(12px); }
+    to{ opacity:1; transform:scale(1) translateY(0); }
+  }
+  .modal-overlay{
+    animation:modalFadeIn 0.18s ease;
+  }
+  .modal-card{
+    animation:modalCardIn 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  .result, .product-card, .result-item{
+    animation:screenFadeIn 0.22s ease;
+  }
+  @keyframes tabContentIn{
+    from{ opacity:0; transform:translateX(6px); }
+    to{ opacity:1; transform:translateX(0); }
+  }
+  .tab-content-anim{
+    animation:tabContentIn 0.2s ease;
+  }
 </style>
 </head>
 <body>
@@ -814,6 +845,9 @@ const TRANSLATIONS = {
   compareNote1: {tr:'Not: Bu karşılaştırma tablosu örnek (simüle) verilerle çalışıyor. Gerçek fiyatlar için resmi mağaza API\'lerinin bağlanması gerekiyor.', en:'Note: This comparison table uses sample (simulated) data. Real prices require connecting official store APIs.', ja:'注: この比較表はサンプル(シミュレーション)データを使用しています。実際の価格には公式店舗APIの連携が必要です。', zh:'注:此比较表使用示例(模拟)数据。真实价格需要连接官方商店API。'},
   compareNote2: {tr:'"Git" linkleri affiliate/ortaklık bağlantılarıdır — bir mağazadan alışveriş yaparsan küçük bir komisyon kazanabiliriz, senin ödediğin fiyatı değiştirmez.', en:'"Go" links are affiliate links — if you shop through a store we may earn a small commission, at no extra cost to you.', ja:'「移動」リンクはアフィリエイトリンクです。購入すると少額の手数料を得ることがありますが、あなたの支払額は変わりません。', zh:'"前往"链接为联盟链接——如果您通过商店购物,我们可能获得少量佣金,不会增加您的费用。'},
   goBtn: {tr:'Git', en:'Go', ja:'移動', zh:'前往'},
+  galleryBtn: {tr:'Galeriden Seç', en:'Choose from Gallery', ja:'ギャラリーから選択', zh:'从相册选择'},
+  galleryNoBarcode: {tr:'Görselde barkod bulunamadı. Farklı bir fotoğraf dene ya da elle gir.', en:'No barcode found in the image. Try another photo or enter manually.', ja:'画像にバーコードが見つかりませんでした。別の写真を試すか手動で入力してください。', zh:'图片中未找到条码。请尝试其他照片或手动输入。'},
+  galleryUnsupported: {tr:'Bu cihaz görselden barkod okumayı desteklemiyor.', en:'This device does not support scanning barcodes from images.', ja:'このデバイスは画像からのバーコード読み取りに対応していません。', zh:'此设备不支持从图片扫描条码。'},
 };
 
 const TRANSLATIONS_FN = {
@@ -975,10 +1009,12 @@ function renderAdCloseButton(){
 function render(){
   const app = document.getElementById('app');
   applyTheme();
-  if(state.screen === 'home') app.innerHTML = renderHome();
-  else if(state.screen === 'convert') app.innerHTML = renderConvert();
-  else if(state.screen === 'scan') app.innerHTML = renderScan();
-  else if(state.screen === 'tracking') app.innerHTML = renderTracking();
+  let content = '';
+  if(state.screen === 'home') content = renderHome();
+  else if(state.screen === 'convert') content = renderConvert();
+  else if(state.screen === 'scan') content = renderScan();
+  else if(state.screen === 'tracking') content = renderTracking();
+  app.innerHTML = '<div class="screen-anim">' + content + '</div>';
   attachHandlers();
 }
 
@@ -1074,7 +1110,11 @@ function renderScan(){
       <div class="scan-box" id="scan-box">
         <p class="cam-msg" id="cam-msg">${t('camStartHint')}</p>
       </div>
-      <button class="primary teal-btn" id="cam-btn" onclick="startCamera()">${t('camOpenBtn')}</button>
+      <div class="row">
+        <button class="primary teal-btn" id="cam-btn" style="flex:1;" onclick="startCamera()">${t('camOpenBtn')}</button>
+        <button class="primary" style="flex:1; background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="document.getElementById('gallery-input').click()">${t('galleryBtn')}</button>
+      </div>
+      <input type="file" accept="image/*" id="gallery-input" style="display:none;" onchange="handleGalleryImage(event)" />
       <div class="divider">${t('orManual')}</div>
 
       <div class="tabs">
@@ -1082,6 +1122,7 @@ function renderScan(){
         <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')">${t('tabName')}</button>
       </div>
 
+      <div class="tab-content-anim">
       ${mode === 'barcode' ? `
         <div>
           <label>${t('barcodeLabel')}</label>
@@ -1096,6 +1137,7 @@ function renderScan(){
         </div>
         <button class="primary" onclick="searchByName()">${t('searchBtn')}</button>
       `}
+      </div>
 
       <div id="scan-result"></div>
 
@@ -1662,6 +1704,36 @@ async function hideBannerAd(){
   try{
     await window.Capacitor.Plugins.AdMob.hideBanner();
   }catch(e){}
+}
+
+async function handleGalleryImage(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const box = document.getElementById('scan-result');
+  if(!('BarcodeDetector' in window)){
+    box.innerHTML = `<div class="error">${t('galleryUnsupported')}</div>`;
+    event.target.value = '';
+    return;
+  }
+  box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingProduct')}</div>`;
+  try{
+    const bitmap = await createImageBitmap(file);
+    const detector = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']});
+    const codes = await detector.detect(bitmap);
+    if(codes.length === 0){
+      box.innerHTML = `<div class="error">${t('galleryNoBarcode')}</div>`;
+      event.target.value = '';
+      return;
+    }
+    const rawValue = codes[0].rawValue;
+    state.searchMode = 'barcode';
+    render();
+    document.getElementById('barcode').value = rawValue;
+    lookupBarcode();
+  }catch(e){
+    box.innerHTML = `<div class="error">${td('productFetchError', e.message)}</div>`;
+  }
+  event.target.value = '';
 }
 
 initAdMob();
