@@ -36,7 +36,7 @@
     flex-direction:column;
     position:relative;
     overflow:hidden;
-    padding-top:72px;
+    padding-top:var(--ad-height, 64px);
   }
 
   /* Ticker tape - signature element */
@@ -1606,6 +1606,7 @@ async function initAdMob(){
       initializeForTesting: true,
     });
     admobReady = true;
+    setupAdSizeListener();
     showBannerAd();
     showInterstitialOnce();
   }catch(e){
@@ -1621,6 +1622,17 @@ function toggleAds(){
   try{ localStorage.setItem('fiyatla_ads_enabled', adsEnabled ? 'true' : 'false'); }catch(e){}
   if(adsEnabled) showBannerAd(); else hideBannerAd();
   render();
+}
+
+function setupAdSizeListener(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    window.Capacitor.Plugins.AdMob.addListener('bannerAdSizeChanged', (info) => {
+      if(info && info.height){
+        document.documentElement.style.setProperty('--ad-height', (info.height + 6) + 'px');
+      }
+    });
+  }catch(e){}
 }
 
 async function showBannerAd(){
