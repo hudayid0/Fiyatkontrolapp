@@ -122,6 +122,7 @@
     font-size:19px;
     margin:0;
     font-weight:600;
+    color:var(--text);
   }
   .card p{
     margin:0;
@@ -984,6 +985,9 @@ function renderHome(){
         <p>${t('card3Desc')}</p>
       </div>
     </main>
+    <div style="text-align:center; padding:0 20px 8px;">
+      <button class="chip" onclick="toggleAds()">${adsEnabled ? '🔔' : '🔕'} Reklamlar: ${adsEnabled ? 'Açık' : 'Kapalı'}</button>
+    </div>
     <footer>${t('footerHome')}</footer>
   `;
 }
@@ -1553,7 +1557,18 @@ async function initAdMob(){
   }
 }
 
+let adsEnabled = true;
+try{ adsEnabled = localStorage.getItem('fiyatla_ads_enabled') !== 'false'; }catch(e){}
+
+function toggleAds(){
+  adsEnabled = !adsEnabled;
+  try{ localStorage.setItem('fiyatla_ads_enabled', adsEnabled ? 'true' : 'false'); }catch(e){}
+  if(adsEnabled) showBannerAd(); else hideBannerAd();
+  render();
+}
+
 async function showBannerAd(){
+  if(!adsEnabled) return;
   if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
   try{
     await window.Capacitor.Plugins.AdMob.showBanner({
