@@ -592,22 +592,24 @@
     cursor:pointer;
   }
   .ad-close-wrap{
-    position:fixed;
-    top:4px;
-    right:8px;
-    z-index:1500;
+    width:100%;
+    display:flex;
+    justify-content:flex-end;
+    padding:4px 10px;
+    background:var(--surface);
+    border-bottom:1px solid var(--line);
   }
   .ad-close-btn{
-    background:var(--surface-2);
-    border:1px solid var(--line);
+    background:transparent;
+    border:none;
     color:var(--text-dim);
-    width:28px;
-    height:28px;
-    border-radius:50%;
-    font-size:14px;
+    font-size:12px;
     line-height:1;
     cursor:pointer;
-    box-shadow:0 2px 6px rgba(0,0,0,0.3);
+    padding:4px 8px;
+    display:flex;
+    align-items:center;
+    gap:4px;
   }
 </style>
 </head>
@@ -963,9 +965,11 @@ function renderAdCloseButton(){
     el = document.createElement('div');
     el.id = 'ad-close-wrap';
     el.className = 'ad-close-wrap';
-    el.innerHTML = '<button class="ad-close-btn" onclick="toggleAds()">✕</button>';
-    document.body.appendChild(el);
+    document.body.insertBefore(el, document.body.firstChild);
   }
+  const closeLabels = {tr:'Reklamı kapat', en:'Close ad', ja:'広告を閉じる', zh:'关闭广告'};
+  const label = closeLabels[state.lang] || closeLabels.tr;
+  el.innerHTML = `<button class="ad-close-btn" onclick="toggleAds()">${label} ✕</button>`;
 }
 
 function render(){
