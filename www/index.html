@@ -1022,7 +1022,7 @@ function renderHome(){
         <p>${t('card3Desc')}</p>
       </div>
     </main>
-    <footer>${t('footerHome')}<br><span style="font-size:9px;">${window.adDebugInfo || 'debug yok'}</span></footer>
+    <footer>${t('footerHome')}</footer>
   `;
 }
 
@@ -1632,7 +1632,7 @@ function setupAdSizeListener(){
     window.Capacitor.Plugins.AdMob.addListener('bannerAdSizeChanged', (info) => {
       window.adDebugInfo = 'olay geldi: ' + JSON.stringify(info);
       if(info && info.height){
-        document.documentElement.style.setProperty('--ad-height', (info.height + 6) + 'px');
+        document.documentElement.style.setProperty('--ad-height', info.height + 'px');
       }
       render();
     });
