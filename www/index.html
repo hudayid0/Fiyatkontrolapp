@@ -861,6 +861,8 @@ const TRANSLATIONS = {
   rateNowBtn: {tr:'Değerlendir', en:'Rate now', ja:'評価する', zh:'立即评价'},
   rateLaterBtn: {tr:'Daha sonra', en:'Maybe later', ja:'後で', zh:'稍后'},
   rateNeverBtn: {tr:'Bir daha sorma', en:"Don't ask again", ja:'今後表示しない', zh:'不再询问'},
+  themeToggleAria: {tr:'Tema değiştir', en:'Change theme', ja:'テーマを変更', zh:'切换主题'},
+  ariaSwap: {tr:'Para birimlerinin yönünü değiştir', en:'Swap currency direction', ja:'通貨の方向を切り替え', zh:'切换货币方向'},
 };
 
 const TRANSLATIONS_FN = {
@@ -934,14 +936,14 @@ function setLanguage(lang){
 
 function renderLangBar(){
   const langs = [
-    {code:'tr', flag:'🇹🇷'},
-    {code:'en', flag:'🇬🇧'},
-    {code:'ja', flag:'🇯🇵'},
-    {code:'zh', flag:'🇨🇳'},
+    {code:'tr', flag:'🇹🇷', name:'Türkçe'},
+    {code:'en', flag:'🇬🇧', name:'English'},
+    {code:'ja', flag:'🇯🇵', name:'日本語'},
+    {code:'zh', flag:'🇨🇳', name:'中文'},
   ];
   return `<div class="lang-bar">
-    <button class="theme-btn" onclick="cycleTheme()">${themeIcon()}</button>
-    ${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')">${l.flag}</button>`).join('')}
+    <button class="theme-btn" onclick="cycleTheme()" aria-label="${t('themeToggleAria')}">${themeIcon()}</button>
+    ${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')" aria-label="${l.name}">${l.flag}</button>`).join('')}
   </div>`;
 }
 
@@ -1094,7 +1096,7 @@ function renderConvert(){
             ${CURRENCIES.map(code=>`<option value="${code}" ${code===state.fromCcy?'selected':''}>${ccyName(code)} (${code})</option>`).join('')}
           </select>
         </div>
-        <button class="swap-btn" onclick="swapCurrencies()">⇄</button>
+        <button class="swap-btn" onclick="swapCurrencies()" aria-label="${t('ariaSwap')}">⇄</button>
         <div style="flex:1;">
           <label>${t('toLabel')}</label>
           <select id="to-currency" onchange="onCurrencyChange()">
@@ -1103,7 +1105,7 @@ function renderConvert(){
         </div>
       </div>
       <button class="primary" onclick="doConvert()">${t('convertBtn')}</button>
-      <div id="convert-result"></div>
+      <div id="convert-result" aria-live="polite" aria-atomic="true"></div>
     </main>
     <footer>${rateStatusLabel()}</footer>
   `;
@@ -1152,7 +1154,7 @@ function renderScan(){
       `}
       </div>
 
-      <div id="scan-result"></div>
+      <div id="scan-result" aria-live="polite" aria-atomic="true"></div>
 
       ${history.length ? `
         <div class="history-block">
