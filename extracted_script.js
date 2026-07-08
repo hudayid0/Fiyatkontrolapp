@@ -541,11 +541,11 @@ function renderSettings(){
       </div>
       ` : ''}
       <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
+      </div>
+      <div class="card card-static" style="margin-top:12px;">
         <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
         <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
-      </div>
-      <div class="card" style="margin-top:12px;">
-        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
       </div>
       <div class="card" style="margin-top:12px; text-align:center;">
         <p class="sub">${t('contactLabel')}: <a href="mailto:support.fiyatla@gmail.com" style="color:var(--gold-soft);">support.fiyatla@gmail.com</a></p>
