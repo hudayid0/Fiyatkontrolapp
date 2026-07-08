@@ -1200,9 +1200,6 @@ function renderSettings(){
         <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
       </div>
       <div class="card" style="margin-top:12px;">
-        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="toggleHaptics()">📳 ${t('hapticLabel')}: ${getHapticsEnabled() ? t('stateOn') : t('stateOff')}</button>
-      </div>
-      <div class="card" style="margin-top:12px;">
         <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
       </div>
       <div class="card" style="margin-top:12px; text-align:center;">
@@ -1599,33 +1596,6 @@ function dismissUpdateBanner(version){
   const el = document.getElementById('update-banner');
   if(el) el.remove();
 }
-
-function getHapticsEnabled(){
-  try{
-    return localStorage.getItem('fiyatla_haptics_enabled') !== 'false';
-  }catch(e){
-    return true;
-  }
-}
-
-function toggleHaptics(){
-  const current = getHapticsEnabled();
-  try{ localStorage.setItem('fiyatla_haptics_enabled', current ? 'false' : 'true'); }catch(e){}
-  render();
-}
-
-async function triggerHaptic(){
-  if(!getHapticsEnabled()) return;
-  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.Haptics) return;
-  try{
-    await window.Capacitor.Plugins.Haptics.impact({ style: 'LIGHT' });
-  }catch(e){}
-}
-
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('button');
-  if(btn) triggerHaptic();
-});
 
 function showOfflineBanner(){
   if(document.getElementById('offline-banner')) return;
