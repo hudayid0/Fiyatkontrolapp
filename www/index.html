@@ -896,6 +896,14 @@ const TRANSLATIONS = {
   importPrompt: {tr:'Yedek metnini buraya yapıştır:', en:'Paste your backup text here:', ja:'バックアップテキストをここに貼り付けてください:', zh:'请在此粘贴备份文本:'},
   importSuccess: {tr:'Geri yükleme başarılı.', en:'Restore successful.', ja:'復元に成功しました。', zh:'恢复成功。'},
   importError: {tr:'Geçersiz yedek metni.', en:'Invalid backup text.', ja:'無効なバックアップテキストです。', zh:'备份文本无效。'},
+  settingsMenuLabel: {tr:'Ayarlar', en:'Settings', ja:'設定', zh:'设置'},
+  settingsTitle: {tr:'Ayarlar ve Bilgi', en:'Settings & Info', ja:'設定と情報', zh:'设置与信息'},
+  settingsSub: {tr:'Gizlilik, reklam tercihleri ve uygulama hakkında.', en:'Privacy, ad preferences, and about the app.', ja:'プライバシー、広告設定、アプリについて。', zh:'隐私、广告偏好和关于应用。'},
+  privacyPolicyLink: {tr:'Gizlilik Politikasını Görüntüle', en:'View Privacy Policy', ja:'プライバシーポリシーを見る', zh:'查看隐私政策'},
+  managePrivacyBtn: {tr:'Reklam Tercihlerini Yönet', en:'Manage Ad Preferences', ja:'広告設定を管理', zh:'管理广告偏好'},
+  contactLabel: {tr:'İletişim', en:'Contact', ja:'お問い合わせ', zh:'联系我们'},
+  batteryTipTitle: {tr:'🔋 Bildirimler gelmiyor mu?', en:'🔋 Not receiving reminders?', ja:'🔋 リマインダーが届きませんか?', zh:'🔋 未收到提醒?'},
+  batteryTipBody: {tr:'Bazı telefonlarda (Xiaomi, Huawei, Samsung vb.) pil tasarrufu ayarları hatırlatmaları engelleyebilir. Telefon Ayarları > Pil > Fiyatla\'ya gidip pil kısıtlamasını kaldırmanı öneririz.', en:'On some phones (Xiaomi, Huawei, Samsung, etc.) battery-saving settings may block reminders. We recommend going to Phone Settings > Battery > Fiyatla and removing battery restrictions.', ja:'一部の端末(Xiaomi、Huawei、Samsungなど)ではバッテリー節約設定によりリマインダーがブロックされることがあります。', zh:'在某些手机(小米、华为、三星等)上,省电设置可能会阻止提醒。建议前往手机设置>电池>Fiyatla并解除电池限制。'},
 };
 
 const TRANSLATIONS_FN = {
@@ -977,6 +985,7 @@ function renderLangBar(){
   ];
   return `<div class="lang-bar">
     <button class="theme-btn" onclick="cycleTheme()" aria-label="${t('themeToggleAria')}">${themeIcon()}</button>
+    <button class="theme-btn" onclick="goTo('settings')" aria-label="${t('settingsMenuLabel')}">⚙️</button>
     ${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')" aria-label="${l.name}">${l.flag}</button>`).join('')}
   </div>`;
 }
@@ -1059,19 +1068,28 @@ let animateNextRender = false;
 
 function render(){
   const app = document.getElementById('app');
-  applyTheme();
-  let content = '';
-  if(state.screen === 'home') content = renderHome();
-  else if(state.screen === 'convert') content = renderConvert();
-  else if(state.screen === 'scan') content = renderScan();
-  else if(state.screen === 'tracking') content = renderTracking();
-  if(animateNextRender){
-    app.innerHTML = '<div class="screen-anim">' + content + '</div>';
-    animateNextRender = false;
-  }else{
-    app.innerHTML = content;
+  try{
+    applyTheme();
+    let content = '';
+    if(state.screen === 'home') content = renderHome();
+    else if(state.screen === 'convert') content = renderConvert();
+    else if(state.screen === 'scan') content = renderScan();
+    else if(state.screen === 'tracking') content = renderTracking();
+    else if(state.screen === 'settings') content = renderSettings();
+    if(animateNextRender){
+      app.innerHTML = '<div class="screen-anim">' + content + '</div>';
+      animateNextRender = false;
+    }else{
+      app.innerHTML = content;
+    }
+    attachHandlers();
+  }catch(err){
+    console.log('Render hatasi:', err.message);
+    try{
+      state.screen = 'home';
+      app.innerHTML = '<div style="padding:40px 24px; text-align:center;"><p style="font-size:15px; margin-bottom:16px;">Bir şeyler ters gitti.</p><button class="primary" onclick="location.reload()">Yeniden Başlat</button></div>';
+    }catch(e2){}
   }
-  attachHandlers();
 }
 
 function renderTicker(){
@@ -1086,6 +1104,41 @@ function renderTicker(){
     });
   const html = [...eurItems, ...tryItems].join('');
   return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
+}
+
+function manageAdPrivacy(){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AdMob){
+    window.Capacitor.Plugins.AdMob.showPrivacyOptionsForm().catch(e => {
+      console.log('Gizlilik formu gosterilemedi:', e.message);
+    });
+  }
+}
+
+function renderSettings(){
+  return `${renderLangBar()}
+    <header class="top">
+      <button class="backbtn" onclick="goTo(\'home\')">← Geri</button>
+      <p class="eyebrow">${t('settingsMenuLabel')}</p>
+      <h1>${t('settingsTitle')}</h1>
+      <p class="sub">${t('settingsSub')}</p>
+    </header>
+    <main>
+      <div class="card">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="window.open(\'https://hudayid0.github.io/Fiyatkontrolapp/privacy.html\', \'_system\')">${t('privacyPolicyLink')}</button>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="manageAdPrivacy()">${t('managePrivacyBtn')}</button>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
+        <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
+      </div>
+      <div class="card" style="margin-top:12px; text-align:center;">
+        <p class="sub">${t('contactLabel')}: <a href="mailto:hudayid0@gmail.com" style="color:var(--gold-soft);">hudayid0@gmail.com</a></p>
+        <p class="sub" style="margin-top:6px;">Fiyatla v${APP_VERSION}</p>
+      </div>
+    </main>
+  `;
 }
 
 function renderHome(){
