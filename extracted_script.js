@@ -143,7 +143,7 @@ const TRANSLATIONS = {
   card3Desc: {de:'Erhalte eine taegliche Erinnerung, deine verfolgten Produkte erneut zu pruefen.', tr:"Takip ettiğin ürünler için günlük 'tekrar kontrol et' hatırlatması al.", en:"Get a daily 'check again' reminder for products you track.", ja:'追跡商品について毎日「再確認」リマインダーを受け取ります。', zh:'为您关注的商品每天接收"重新检查"提醒。'},
   footerHome: {de:'Demo-Prototyp - echte Daten stammen teilweise aus Live-APIs', tr:"demo prototip · gerçek veriler kısmi olarak canlı API'lerden gelir", en:'demo prototype · some data comes from live APIs', ja:'デモ・一部データはライブAPIより', zh:'演示原型・部分数据来自实时API'},
 
-  back: {de:'← Zurueck', tr:'← Geri', en:'← Back', ja:'← 戻る', zh:'← 返回'},
+  back: {de:'Zurueck', tr:'Geri', en:'Back', ja:'戻る', zh:'返回'},
   convertEyebrow: {de:'SCHNELLER UMRECHNER', tr:'01 · Hızlı Çevirici', en:'01 · Quick Converter', ja:'01・クイック変換', zh:'01・快速换算'},
   convertTitle: {de:'Preis umrechnen', tr:'Fiyat çevir', en:'Convert price', ja:'価格を変換', zh:'转换价格'},
   amountLabel: {de:'Betrag', tr:'Tutar', en:'Amount', ja:'金額', zh:'金额'},
@@ -524,7 +524,7 @@ function manageAdPrivacy(){
 function renderSettings(){
   return `${renderLangBar()}
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow">←</span> ${t('back')}</button>
       <p class="eyebrow">${t('settingsMenuLabel')}</p>
       <h1>${t('settingsTitle')}</h1>
       <p class="sub">${t('settingsSub')}</p>
@@ -592,7 +592,7 @@ function renderHome(){
 function renderConvert(){
   return `
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow">←</span> ${t('back')}</button>
       <p class="eyebrow">${t('convertEyebrow')}</p>
       <h1>${t('convertTitle')}</h1>
     </header>
@@ -628,7 +628,7 @@ function renderScan(){
   const history = state.searchHistory || [];
   return `
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow">←</span> ${t('back')}</button>
       <p class="eyebrow">${t('scanEyebrow')}</p>
       <h1>${t('scanTitle')}</h1>
       <p class="sub">${t('scanSub')}</p>
@@ -1479,7 +1479,7 @@ function renderTracking(){
   const tracked = getTrackedItems();
   return `
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow">←</span> ${t('back')}</button>
       <p class="eyebrow">${t('trackingEyebrow')}</p>
       <h1>${t('trackingTitle')}</h1>
       <p class="sub">${t('trackingSub')}</p>
