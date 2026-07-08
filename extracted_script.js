@@ -254,43 +254,43 @@ const TRANSLATIONS = {
 
 const TRANSLATIONS_FN = {
   invalidBarcodeFormat: (len) => ({
-    tr: `Geçersiz barkod formatı: ${len} hane girildi. Barkodlar genelde 8, 12, 13 ya da 14 hanelidir.`,
+    de: `Ungueltiges Barcode-Format: ${len} Ziffern eingegeben. Barcodes haben normalerweise 8, 12, 13 oder 14 Ziffern.`, tr: `Geçersiz barkod formatı: ${len} hane girildi. Barkodlar genelde 8, 12, 13 ya da 14 hanelidir.`,
     en: `Invalid barcode format: ${len} digits entered. Barcodes are usually 8, 12, 13, or 14 digits.`,
     ja: `無効なバーコード形式: ${len}桁入力されました。通常は8、12、13、14桁です。`,
     zh: `条码格式无效:输入了${len}位。条码通常为8、12、13或14位。`,
   }),
   barcodeHintInvalid: (len) => ({
-    tr: `${len} hane girildi — 8, 12, 13 ya da 14 hane olmalı.`,
+    de: `${len} Ziffern eingegeben - muss 8, 12, 13 oder 14 sein.`, tr: `${len} hane girildi — 8, 12, 13 ya da 14 hane olmalı.`,
     en: `${len} digits entered — must be 8, 12, 13, or 14.`,
     ja: `${len}桁入力されました — 8、12、13、14桁である必要があります。`,
     zh: `已输入${len}位——必须为8、12、13或14位。`,
   }),
   productFetchError: (msg) => ({
-    tr: `Ürün bilgisi alınamadı: ${msg}`,
+    de: `Produktinformationen konnten nicht abgerufen werden: ${msg}`, tr: `Ürün bilgisi alınamadı: ${msg}`,
     en: `Could not fetch product info: ${msg}`,
     ja: `商品情報を取得できませんでした: ${msg}`,
     zh: `无法获取商品信息:${msg}`,
   }),
   noResultsFor: (query) => ({
-    tr: `"${query}" için sonuç bulunamadı. Farklı bir arama terimi dene ya da barkod ile ara.`,
+    de: `Keine Ergebnisse fuer "${query}". Versuche einen anderen Suchbegriff oder suche per Barcode.`, tr: `"${query}" için sonuç bulunamadı. Farklı bir arama terimi dene ya da barkod ile ara.`,
     en: `No results for "${query}". Try a different search term or search by barcode.`,
     ja: `「${query}」の結果が見つかりません。別の検索語かバーコードでお試しください。`,
     zh: `未找到"${query}"的结果。请尝试其他搜索词或使用条码搜索。`,
   }),
   trackScheduleError: (msg) => ({
-    tr: `Ürün takip listesine eklendi ama bildirim planlanamadı: ${msg}`,
+    de: `Produkt zur Watchliste hinzugefuegt, aber Erinnerung konnte nicht geplant werden: ${msg}`, tr: `Ürün takip listesine eklendi ama bildirim planlanamadı: ${msg}`,
     en: `Product added to watchlist but reminder could not be scheduled: ${msg}`,
     ja: `商品は追加されましたが、リマインダーを設定できませんでした: ${msg}`,
     zh: `商品已添加但无法设置提醒:${msg}`,
   }),
   trackSuccess: (name) => ({
-    tr: `"${name}" takip listesine eklendi. Her gün hatırlatma bildirimi alacaksın.`,
+    de: `"${name}" wurde zur Watchliste hinzugefuegt. Du erhaeltst eine taegliche Erinnerung.`, tr: `"${name}" takip listesine eklendi. Her gün hatırlatma bildirimi alacaksın.`,
     en: `"${name}" added to your watchlist. You will get a daily reminder.`,
     ja: `「${name}」がウォッチリストに追加されました。毎日リマインダーが届きます。`,
     zh: `"${name}"已加入关注列表。您将每天收到提醒。`,
   }),
   compareMatch: (score) => ({
-    tr: `%${score} eşleşme`,
+    de: `${score}% Uebereinstimmung`, tr: `%${score} eşleşme`,
     en: `${score}% match`,
     ja: `一致度 ${score}%`,
     zh: `匹配度 ${score}%`,
@@ -302,6 +302,16 @@ function td(key, ...args){
   if(!entry) return key;
   const result = entry(...args);
   return result[state.lang] || result.tr;
+}
+
+function formatNumber(num, decimals){
+  const localeMap = { tr:'tr-TR', en:'en-US', de:'de-DE', ja:'ja-JP', zh:'zh-CN' };
+  const locale = localeMap[state.lang] || 'en-US';
+  try{
+    return new Intl.NumberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
+  }catch(e){
+    return num.toFixed(decimals);
+  }
 }
 
 function t(key){
@@ -452,12 +462,12 @@ function render(){
 function renderTicker(){
   const eurItems = Object.entries(RATES_TO_EUR)
     .filter(([code]) => code !== 'TRY')
-    .map(([code, rate]) => `<span>1 ${code} = <b>€${rate.toFixed(4)}</b></span>`);
+    .map(([code, rate]) => `<span>1 ${code} = <b>€${formatNumber(rate, 4)}</b></span>`);
   const tryItems = Object.entries(RATES_TO_EUR)
     .filter(([code]) => code !== 'TRY')
     .map(([code]) => {
       const inTry = convertAmount(1, code, 'TRY');
-      return `<span>1 ${code} = <b>₺${inTry.toFixed(2)}</b></span>`;
+      return `<span>1 ${code} = <b>₺${formatNumber(inTry, 2)}</b></span>`;
     });
   const html = [...eurItems, ...tryItems].join('');
   return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
@@ -765,11 +775,11 @@ function doConvert(){
   }
   const converted = convertAmount(amount, from, to);
   const rate = crossRate(from, to);
-  const shareMsg = `${amount} ${from} = ${converted.toFixed(2)} ${to} (Fiyatla ile hesaplandı)`;
+  const shareMsg = `${amount} ${from} = ${formatNumber(converted, 2)} ${to} (Fiyatla ile hesaplandı)`;
   resultBox.innerHTML = `
     <div class="result">
-      <div class="big">${converted.toFixed(2)} ${to}</div>
-      <div class="small">${amount} ${from} · kur: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
+      <div class="big">${formatNumber(converted, 2)} ${to}</div>
+      <div class="small">${amount} ${from} · kur: 1 ${from} = ${formatNumber(rate, 4)} ${to}</div>
       <div class="small" style="margin-top:6px;">${rateStatusLabel()}</div>
       <button id="convert-share-btn" class="chip" style="margin-top:10px;">📤 ${t('shareBtn')}</button>
     </div>
@@ -1030,7 +1040,7 @@ function editTrackedItem(id){
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
       <h3 class="modal-title" id="modal-a11y-title">${item.name}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
-      <input type="number" id="target-price-input" value="${item.targetPrice.toFixed(2)}" step="0.01" inputmode="decimal" />
+      <input type="number" id="target-price-input" value="${formatNumber(item.targetPrice, 2)}" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
         <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
         <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${id}')">${t('trackConfirm')}</button>
@@ -1068,7 +1078,7 @@ async function confirmEditTrackedItem(id){
         notifications: [{
           id: newNotifId,
           title: 'Fiyat Takibi - Fiyatla',
-          body: `${item.name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${target.toFixed(2)})`,
+          body: `${item.name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${formatNumber(target, 2)})`,
           schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
         }]
       });
@@ -1445,7 +1455,7 @@ function buildComparison(name, brand){
         ${v.country}<span class="match-tag ${v.score>=80?'match-high':'match-mid'}">${td('compareMatch', v.score)}</span>
         <div class="store-name">${v.store}</div>
       </td>
-      <td class="${v.priceEur===minPrice?'cheapest':''}">€ ${v.priceEur.toFixed(2)}</td>
+      <td class="${v.priceEur===minPrice?'cheapest':''}">€ ${formatNumber(v.priceEur, 2)}</td>
       <td>
         <a class="go-btn" href="${v.url}" target="_blank" rel="sponsored noopener">${t('goBtn')}</a>
       </td>
@@ -1484,7 +1494,7 @@ function renderTracking(){
         <div class="product-card">
           <div style="flex:1;">
             <div class="pname">${item.name}</div>
-            <div class="pbrand">${item.brand} · hedef fiyat: € ${item.targetPrice.toFixed(2)}</div>
+            <div class="pbrand">${item.brand} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
           </div>
           <button class="go-btn" onclick="editTrackedItem('${item.id}')">${t('editBtn')}</button>
           <button class="go-btn" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
@@ -1548,7 +1558,7 @@ async function trackProduct(name, brand, code, targetPrice){
       notifications: [{
         id: notifId,
         title: 'Fiyat Takibi - Fiyatla',
-        body: `${name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${targetPrice.toFixed(2)})`,
+        body: `${name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${formatNumber(targetPrice, 2)})`,
         schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
       }]
     });
