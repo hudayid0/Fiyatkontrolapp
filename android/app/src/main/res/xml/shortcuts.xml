@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="scan"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_scan_short"
+        android:shortcutLongLabel="@string/shortcut_scan_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.hudayi.fiyatkontrol"
+            android:targetClass="com.hudayi.fiyatkontrol.MainActivity"
+            android:data="com.hudayi.fiyatkontrol://scan" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="convert"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_convert_short"
+        android:shortcutLongLabel="@string/shortcut_convert_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.hudayi.fiyatkontrol"
+            android:targetClass="com.hudayi.fiyatkontrol.MainActivity"
+            android:data="com.hudayi.fiyatkontrol://convert" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="tracking"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_tracking_short"
+        android:shortcutLongLabel="@string/shortcut_tracking_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.hudayi.fiyatkontrol"
+            android:targetClass="com.hudayi.fiyatkontrol.MainActivity"
+            android:data="com.hudayi.fiyatkontrol://tracking" />
+    </shortcut>
+</shortcuts>

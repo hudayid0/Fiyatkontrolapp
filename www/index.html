@@ -896,9 +896,9 @@ const TRANSLATIONS = {
   importPrompt: {tr:'Yedek metnini buraya yapıştır:', en:'Paste your backup text here:', ja:'バックアップテキストをここに貼り付けてください:', zh:'请在此粘贴备份文本:'},
   importSuccess: {tr:'Geri yükleme başarılı.', en:'Restore successful.', ja:'復元に成功しました。', zh:'恢复成功。'},
   importError: {tr:'Geçersiz yedek metni.', en:'Invalid backup text.', ja:'無効なバックアップテキストです。', zh:'备份文本无效。'},
-  settingsMenuLabel: {tr:'Ayarlar', en:'Settings', ja:'設定', zh:'设置'},
-  settingsTitle: {tr:'Ayarlar ve Bilgi', en:'Settings & Info', ja:'設定と情報', zh:'设置与信息'},
-  settingsSub: {tr:'Gizlilik, reklam tercihleri ve uygulama hakkında.', en:'Privacy, ad preferences, and about the app.', ja:'プライバシー、広告設定、アプリについて。', zh:'隐私、广告偏好和关于应用。'},
+  settingsMenuLabel: {tr:'Bilgi', en:'Info', ja:'情報', zh:'信息'},
+  settingsTitle: {tr:'Bilgi', en:'Info', ja:'情報', zh:'信息'},
+  settingsSub: {tr:'Gizlilik ve uygulama hakkında.', en:'Privacy and about the app.', ja:'プライバシーとアプリについて。', zh:'隐私和关于应用。'},
   privacyPolicyLink: {tr:'Gizlilik Politikasını Görüntüle', en:'View Privacy Policy', ja:'プライバシーポリシーを見る', zh:'查看隐私政策'},
   managePrivacyBtn: {tr:'Reklam Tercihlerini Yönet', en:'Manage Ad Preferences', ja:'広告設定を管理', zh:'管理广告偏好'},
   contactLabel: {tr:'İletişim', en:'Contact', ja:'お問い合わせ', zh:'联系我们'},
@@ -906,6 +906,11 @@ const TRANSLATIONS = {
   batteryTipBody: {tr:'Bazı telefonlarda (Xiaomi, Huawei, Samsung vb.) pil tasarrufu ayarları hatırlatmaları engelleyebilir. Telefon Ayarları > Pil > Fiyatla\'ya gidip pil kısıtlamasını kaldırmanı öneririz.', en:'On some phones (Xiaomi, Huawei, Samsung, etc.) battery-saving settings may block reminders. We recommend going to Phone Settings > Battery > Fiyatla and removing battery restrictions.', ja:'一部の端末(Xiaomi、Huawei、Samsungなど)ではバッテリー節約設定によりリマインダーがブロックされることがあります。', zh:'在某些手机(小米、华为、三星等)上,省电设置可能会阻止提醒。建议前往手机设置>电池>Fiyatla并解除电池限制。'},
   shareBtn: {tr:'Paylaş', en:'Share', ja:'共有', zh:'分享'},
   termsLink: {tr:'Kullanım Şartlarını Görüntüle', en:'View Terms of Service', ja:'利用規約を見る', zh:'查看服务条款'},
+  feedbackBtn: {tr:'💬 Öneri / Hata Bildir', en:'💬 Send Feedback', ja:'💬 フィードバックを送る', zh:'💬 发送反馈'},
+  clearDataBtn: {tr:'🗑️ Tüm Verileri Temizle', en:'🗑️ Clear All Data', ja:'🗑️ すべてのデータを削除', zh:'🗑️ 清除所有数据'},
+  clearDataTitle: {tr:'Emin misin?', en:'Are you sure?', ja:'よろしいですか?', zh:'您确定吗?'},
+  clearDataWarning: {tr:'Takip listen, arama geçmişin ve tüm tercihlerin kalıcı olarak silinecek. Bu işlem geri alınamaz.', en:'Your watchlist, search history, and all preferences will be permanently deleted. This cannot be undone.', ja:'ウォッチリスト、検索履歴、すべての設定が完全に削除されます。この操作は元に戻せません。', zh:'您的关注列表、搜索历史和所有偏好设置将被永久删除。此操作无法撤销。'},
+  clearDataConfirmBtn: {tr:'Evet, Sil', en:'Yes, Delete', ja:'はい、削除します', zh:'是的,删除'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1108,6 +1113,45 @@ function renderTicker(){
   return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
 }
 
+function sendFeedback(){
+  const subject = encodeURIComponent('Fiyatla - Geri Bildirim (v' + APP_VERSION + ')');
+  const body = encodeURIComponent('Merhaba,\n\n');
+  window.open('mailto:support.fiyatla@gmail.com?subject=' + subject + '&body=' + body, '_system');
+}
+
+function confirmClearAllData(){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'clear-data-modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <p class="eyebrow" id="modal-a11y-title">⚠️ ${t('clearDataTitle')}</p>
+      <p class="modal-sub">${t('clearDataWarning')}</p>
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="closeClearDataModal()">${t('trackVazgec')}</button>
+        <button class="modal-btn-primary" style="background:var(--danger); color:#fff;" onclick="executeClearAllData()">${t('clearDataConfirmBtn')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  initModalA11y(overlay);
+}
+
+function closeClearDataModal(){
+  const el = document.getElementById('clear-data-modal-overlay');
+  if(el){
+    if(el._a11yCleanup) el._a11yCleanup();
+    el.remove();
+  }
+}
+
+function executeClearAllData(){
+  try{
+    localStorage.clear();
+  }catch(e){}
+  location.reload();
+}
+
 function manageAdPrivacy(){
   if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AdMob){
     window.Capacitor.Plugins.AdMob.showPrivacyOptionsForm().catch(e => {
@@ -1140,9 +1184,15 @@ function renderSettings(){
         <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
         <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
       </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
+      </div>
       <div class="card" style="margin-top:12px; text-align:center;">
         <p class="sub">${t('contactLabel')}: <a href="mailto:support.fiyatla@gmail.com" style="color:var(--gold-soft);">support.fiyatla@gmail.com</a></p>
         <p class="sub" style="margin-top:6px;">Fiyatla v${APP_VERSION}</p>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--danger); box-shadow:none; border:1px solid var(--danger);" onclick="confirmClearAllData()">${t('clearDataBtn')}</button>
       </div>
     </main>
   `;
@@ -2397,6 +2447,7 @@ maybeShowOnboarding(window.fiyatlaOpenCount);
 initAdMob();
 fetchLiveRates();
 setupBackButton();
+setupDeepLinks();
 checkForUpdate();
 setTimeout(() => maybeShowRatePrompt(window.fiyatlaOpenCount), 2500);
 
@@ -2425,6 +2476,16 @@ function exitToastMessage(){
     zh: '再次点击退出',
   };
   return msgs[state.lang] || msgs.tr;
+}
+
+function setupDeepLinks(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('appUrlOpen', (data) => {
+    if(!data || !data.url) return;
+    if(data.url.indexOf('scan') !== -1) goTo('scan');
+    else if(data.url.indexOf('convert') !== -1) goTo('convert');
+    else if(data.url.indexOf('tracking') !== -1) goTo('tracking');
+  });
 }
 
 function setupBackButton(){
