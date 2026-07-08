@@ -913,6 +913,9 @@ const TRANSLATIONS = {
   clearDataConfirmBtn: {tr:'Evet, Sil', en:'Yes, Delete', ja:'はい、削除します', zh:'是的,删除'},
   offlineMessage: {tr:'📡 İnternet bağlantın yok. Bazı özellikler çalışmayabilir.', en:'📡 No internet connection. Some features may not work.', ja:'📡 インターネット接続がありません。一部の機能が動作しない場合があります。', zh:'📡 没有网络连接。某些功能可能无法使用。'},
   invalidAmountRange: {tr:'Lütfen geçerli (pozitif ve makul büyüklükte) bir tutar gir.', en:'Please enter a valid (positive, reasonable) amount.', ja:'有効な(正の、妥当な範囲の)金額を入力してください。', zh:'请输入有效的(正数且合理范围内的)金额。'},
+  hapticLabel: {tr:'Dokunma Geri Bildirimi', en:'Haptic Feedback', ja:'触覚フィードバック', zh:'触觉反馈'},
+  stateOn: {tr:'Açık', en:'On', ja:'オン', zh:'开'},
+  stateOff: {tr:'Kapalı', en:'Off', ja:'オフ', zh:'关'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1195,6 +1198,9 @@ function renderSettings(){
       <div class="card" style="margin-top:12px;">
         <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
         <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="toggleHaptics()">📳 ${t('hapticLabel')}: ${getHapticsEnabled() ? t('stateOn') : t('stateOff')}</button>
       </div>
       <div class="card" style="margin-top:12px;">
         <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
@@ -1594,7 +1600,22 @@ function dismissUpdateBanner(version){
   if(el) el.remove();
 }
 
+function getHapticsEnabled(){
+  try{
+    return localStorage.getItem('fiyatla_haptics_enabled') !== 'false';
+  }catch(e){
+    return true;
+  }
+}
+
+function toggleHaptics(){
+  const current = getHapticsEnabled();
+  try{ localStorage.setItem('fiyatla_haptics_enabled', current ? 'false' : 'true'); }catch(e){}
+  render();
+}
+
 async function triggerHaptic(){
+  if(!getHapticsEnabled()) return;
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.Haptics) return;
   try{
     await window.Capacitor.Plugins.Haptics.impact({ style: 'LIGHT' });
