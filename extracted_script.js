@@ -524,7 +524,7 @@ function manageAdPrivacy(){
 function renderSettings(){
   return `${renderLangBar()}
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">← Geri</button>
+      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
       <p class="eyebrow">${t('settingsMenuLabel')}</p>
       <h1>${t('settingsTitle')}</h1>
       <p class="sub">${t('settingsSub')}</p>
@@ -628,7 +628,7 @@ function renderScan(){
   const history = state.searchHistory || [];
   return `
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">← Geri</button>
+      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
       <p class="eyebrow">${t('scanEyebrow')}</p>
       <h1>${t('scanTitle')}</h1>
       <p class="sub">${t('scanSub')}</p>
@@ -1479,7 +1479,7 @@ function renderTracking(){
   const tracked = getTrackedItems();
   return `
     <header class="top">
-      <button class="backbtn" onclick="goTo('home')">← Geri</button>
+      <button class="backbtn" onclick="goTo('home')">${t('back')}</button>
       <p class="eyebrow">${t('trackingEyebrow')}</p>
       <h1>${t('trackingTitle')}</h1>
       <p class="sub">${t('trackingSub')}</p>
