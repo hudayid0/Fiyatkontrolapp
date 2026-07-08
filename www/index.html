@@ -904,6 +904,7 @@ const TRANSLATIONS = {
   contactLabel: {tr:'İletişim', en:'Contact', ja:'お問い合わせ', zh:'联系我们'},
   batteryTipTitle: {tr:'🔋 Bildirimler gelmiyor mu?', en:'🔋 Not receiving reminders?', ja:'🔋 リマインダーが届きませんか?', zh:'🔋 未收到提醒?'},
   batteryTipBody: {tr:'Bazı telefonlarda (Xiaomi, Huawei, Samsung vb.) pil tasarrufu ayarları hatırlatmaları engelleyebilir. Telefon Ayarları > Pil > Fiyatla\'ya gidip pil kısıtlamasını kaldırmanı öneririz.', en:'On some phones (Xiaomi, Huawei, Samsung, etc.) battery-saving settings may block reminders. We recommend going to Phone Settings > Battery > Fiyatla and removing battery restrictions.', ja:'一部の端末(Xiaomi、Huawei、Samsungなど)ではバッテリー節約設定によりリマインダーがブロックされることがあります。', zh:'在某些手机(小米、华为、三星等)上,省电设置可能会阻止提醒。建议前往手机设置>电池>Fiyatla并解除电池限制。'},
+  shareBtn: {tr:'Paylaş', en:'Share', ja:'共有', zh:'分享'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1134,7 +1135,7 @@ function renderSettings(){
         <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
       </div>
       <div class="card" style="margin-top:12px; text-align:center;">
-        <p class="sub">${t('contactLabel')}: <a href="mailto:hudayid0@gmail.com" style="color:var(--gold-soft);">hudayid0@gmail.com</a></p>
+        <p class="sub">${t('contactLabel')}: <a href="mailto:support.fiyatla@gmail.com" style="color:var(--gold-soft);">support.fiyatla@gmail.com</a></p>
         <p class="sub" style="margin-top:6px;">Fiyatla v${APP_VERSION}</p>
       </div>
     </main>
@@ -1358,13 +1359,17 @@ function doConvert(){
   }
   const converted = convertAmount(amount, from, to);
   const rate = crossRate(from, to);
+  const shareMsg = `${amount} ${from} = ${converted.toFixed(2)} ${to} (Fiyatla ile hesaplandı)`;
   resultBox.innerHTML = `
     <div class="result">
       <div class="big">${converted.toFixed(2)} ${to}</div>
       <div class="small">${amount} ${from} · kur: 1 ${from} = ${rate.toFixed(4)} ${to}</div>
       <div class="small" style="margin-top:6px;">${rateStatusLabel()}</div>
+      <button id="convert-share-btn" class="chip" style="margin-top:10px;">📤 ${t('shareBtn')}</button>
     </div>
   `;
+  const shareBtn = document.getElementById('convert-share-btn');
+  if(shareBtn) shareBtn.onclick = () => shareText(shareMsg);
 }
 
 // ---- Screen 2: camera + barcode ----
@@ -1739,6 +1744,19 @@ function debounceAction(key, delayMs){
   return true;
 }
 
+async function shareText(text){
+  try{
+    if(navigator.share){
+      await navigator.share({ text: text });
+    }else if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+      showToast(t('exportSuccess'));
+    }
+  }catch(e){
+    // kullanici paylasim penceresini iptal etmis olabilir, sorun degil
+  }
+}
+
 function escapeHtml(str){
   if(str === null || str === undefined) return '';
   return String(str)
@@ -1923,12 +1941,16 @@ function renderProductResult(p, code){
         <div class="pbrand">${brand} · barkod ${code}</div>
         <div class="pbrand" style="opacity:0.7; margin-top:2px;">${p._source === 'upcitemdb' ? t('sourceUpc') : t('sourceOff')}
           <button style="background:none; border:none; text-decoration:underline; color:var(--gold-soft); font-size:11px; cursor:pointer; margin-left:6px;" onclick="refreshProduct('${code}')">↻ ${t('refreshBtn')}</button>
+          <button id="product-share-btn" style="background:none; border:none; text-decoration:underline; color:var(--gold-soft); font-size:11px; cursor:pointer; margin-left:6px;">📤 ${t('shareBtn')}</button>
         </div>
       </div>
     </div>
     <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">🔔 Bu ürünü takip et</button>
     ${comparison}
   `;
+
+  const shareBtn2 = document.getElementById('product-share-btn');
+  if(shareBtn2) shareBtn2.onclick = () => shareText(`${name} - ${brand} (Fiyatla ile bulundu)`);
 }
 
 // ---- Fuzzy matching demo ----
