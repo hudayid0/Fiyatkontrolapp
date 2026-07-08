@@ -868,7 +868,7 @@ const TRANSLATIONS = {
   compareNote2: {de:'Preise koennen je nach Geschaeft variieren.', tr:'"Git" linkleri affiliate/ortaklık bağlantılarıdır — bir mağazadan alışveriş yaparsan küçük bir komisyon kazanabiliriz, senin ödediğin fiyatı değiştirmez.', en:'"Go" links are affiliate links — if you shop through a store we may earn a small commission, at no extra cost to you.', ja:'「移動」リンクはアフィリエイトリンクです。購入すると少額の手数料を得ることがありますが、あなたの支払額は変わりません。', zh:'"前往"链接为联盟链接——如果您通过商店购物,我们可能获得少量佣金,不会增加您的费用。'},
   goBtn: {de:'Los', tr:'Git', en:'Go', ja:'移動', zh:'前往'},
   galleryBtn: {de:'Aus Galerie waehlen', tr:'Galeriden Seç', en:'Choose from Gallery', ja:'ギャラリーから選択', zh:'从相册选择'},
-  galleryNoBarcode: {tr:'Görselde barkod bulunamadı. Farklı bir fotoğraf dene ya da elle gir.', en:'No barcode found in the image. Try another photo or enter manually.', ja:'画像にバーコードが見つかりませんでした。別の写真を試すか手動で入力してください。', zh:'图片中未找到条码。请尝试其他照片或手动输入。'},
+  galleryNoBarcode: {de:'Kein Barcode im Bild gefunden. Versuche ein anderes Foto oder gib ihn manuell ein.', tr:'Görselde barkod bulunamadı. Farklı bir fotoğraf dene ya da elle gir.', en:'No barcode found in the image. Try another photo or enter manually.', ja:'画像にバーコードが見つかりませんでした。別の写真を試すか手動で入力してください。', zh:'图片中未找到条码。请尝试其他照片或手动输入。'},
   galleryUnsupported: {de:'Dieses Geraet unterstuetzt das Scannen von Barcodes aus Bildern nicht.', tr:'Bu cihaz görselden barkod okumayı desteklemiyor.', en:'This device does not support scanning barcodes from images.', ja:'このデバイスは画像からのバーコード読み取りに対応していません。', zh:'此设备不支持从图片扫描条码。'},
   searchingWiderDb: {de:'Suche in weiteren Produktkategorien...', tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
   invalidBarcodeChecksum: {de:'Diese Barcode-Nummer scheint ungueltig zu sein.', tr:'Bu barkod numarası geçersiz görünüyor (kontrol basamağı tutmuyor). Numarayı kontrol et.', en:'This barcode number appears invalid (checksum mismatch). Please check the number.', ja:'このバーコード番号は無効のようです(チェックデジットが一致しません)。番号を確認してください。', zh:'此条码号似乎无效(校验位不匹配)。请检查号码。'},
@@ -921,6 +921,7 @@ const TRANSLATIONS = {
   hapticLabel: {de:'Haptisches Feedback', tr:'Dokunma Geri Bildirimi', en:'Haptic Feedback', ja:'触覚フィードバック', zh:'触觉反馈'},
   stateOn: {de:'An', tr:'Açık', en:'On', ja:'オン', zh:'开'},
   stateOff: {de:'Aus', tr:'Kapalı', en:'Off', ja:'オフ', zh:'关'},
+  egLabel: {tr:'Örn.', en:'E.g.', de:'Z.B.', ja:'例:', zh:'例如:'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1323,14 +1324,14 @@ function renderScan(){
       ${mode === 'barcode' ? `
         <div>
           <label>${t('barcodeLabel')}</label>
-          <input type="text" id="barcode" placeholder="Örn. 4006381333931" inputmode="numeric" maxlength="14" />
+          <input type="text" id="barcode" placeholder="${t('egLabel')} 4006381333931" inputmode="numeric" maxlength="14" />
           <div class="hint" id="barcode-hint">${t('barcodeHintDefault')}</div>
         </div>
         <button class="primary" onclick="lookupBarcode()">${t('findProductBtn')}</button>
       ` : `
         <div>
           <label>${t('productNameLabel')}</label>
-          <input type="text" id="product-name" placeholder="Örn. Nutella 400g" />
+          <input type="text" id="product-name" placeholder="${t('egLabel')} Nutella 400g" />
         </div>
         <button class="primary" onclick="searchByName()">${t('searchBtn')}</button>
       `}
