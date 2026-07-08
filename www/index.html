@@ -2217,9 +2217,9 @@ async function trackProduct(name, brand, code, targetPrice){
         schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
       }]
     });
-    alert(td('trackSuccess', name));
+    showToast(td('trackSuccess', name));
   }catch(e){
-    alert(td('trackScheduleError', e.message));
+    showToast(td('trackScheduleError', e.message));
   }
 }
 
