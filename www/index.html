@@ -1706,7 +1706,7 @@ function editTrackedItem(id){
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
       <h3 class="modal-title" id="modal-a11y-title">${item.name}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
-      <input type="number" id="target-price-input" value="${formatNumber(item.targetPrice, 2)}" step="0.01" inputmode="decimal" />
+      <input type="number" id="target-price-input" value="${item.targetPrice.toFixed(2)}" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
         <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
         <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${id}')">${t('trackConfirm')}</button>
