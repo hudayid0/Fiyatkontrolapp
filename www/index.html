@@ -507,8 +507,12 @@
     background:var(--surface);
     border:1px solid var(--line);
     border-radius:10px;
-    font-size:16px;
-    padding:5px 9px;
+    font-size:18px;
+    min-width:44px;
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
     cursor:pointer;
     opacity:0.55;
     transition:opacity .15s ease, border-color .15s ease;
@@ -589,8 +593,12 @@
     background:var(--surface);
     border:1px solid var(--line);
     border-radius:10px;
-    font-size:16px;
-    padding:5px 9px;
+    font-size:18px;
+    min-width:44px;
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
     cursor:pointer;
   }
   .ad-close-wrap{
@@ -643,6 +651,13 @@
   }
   .tab-content-anim{
     animation:tabContentIn 0.2s ease;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .screen-anim, .tab-content-anim, .modal-overlay, .modal-card,
+    .result, .product-card, .result-item, .swap-btn{
+      animation:none !important;
+      transition:none !important;
+    }
   }
 </style>
 </head>
@@ -926,6 +941,7 @@ function t(key){
 function setLanguage(lang){
   state.lang = lang;
   try{ localStorage.setItem('fiyatla_lang', lang); }catch(e){}
+  document.documentElement.lang = lang;
   const defaultCcy = LANG_TO_CCY[lang];
   if(defaultCcy){
     state.fromCcy = defaultCcy;
@@ -1044,7 +1060,7 @@ function renderTicker(){
       return `<span>1 ${code} = <b>₺${inTry.toFixed(2)}</b></span>`;
     });
   const html = [...eurItems, ...tryItems].join('');
-  return `<div class="ticker"><div class="ticker-track">${html}${html}</div></div>`;
+  return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
 }
 
 function renderHome(){
@@ -1133,8 +1149,8 @@ function renderScan(){
       <div class="divider">${t('orManual')}</div>
 
       <div class="tabs">
-        <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')">${t('tabBarcode')}</button>
-        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')">${t('tabName')} <span style="font-size:9px; opacity:0.65;">(${t('experimentalTag')})</span></button>
+        <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')" role="tab" aria-selected="${mode==='barcode'}">${t('tabBarcode')}</button>
+        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')" role="tab" aria-selected="${mode==='name'}">${t('tabName')} <span style="font-size:9px; opacity:0.65;">(${t('experimentalTag')})</span></button>
       </div>
 
       <div class="tab-content-anim">
@@ -1349,7 +1365,7 @@ function showRateModal(){
   overlay.id = 'rate-modal-overlay';
   overlay.innerHTML = `
     <div class="modal-card">
-      <p class="eyebrow">⭐ ${t('rateTitle')}</p>
+      <p class="eyebrow" id="modal-a11y-title">⭐ ${t('rateTitle')}</p>
       <p class="modal-sub">${t('rateMessage')}</p>
       <div class="modal-actions">
         <button class="modal-btn-secondary" onclick="rateLater()">${t('rateLaterBtn')}</button>
@@ -1359,11 +1375,15 @@ function showRateModal(){
     </div>
   `;
   document.body.appendChild(overlay);
+  initModalA11y(overlay);
 }
 
 function closeRateModal(){
   const el = document.getElementById('rate-modal-overlay');
-  if(el) el.remove();
+  if(el){
+    if(el._a11yCleanup) el._a11yCleanup();
+    el.remove();
+  }
 }
 
 function rateNow(){
@@ -1395,7 +1415,7 @@ function editTrackedItem(id){
   overlay.innerHTML = `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
-      <h3 class="modal-title">${item.name}</h3>
+      <h3 class="modal-title" id="modal-a11y-title">${item.name}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
       <input type="number" id="target-price-input" value="${item.targetPrice.toFixed(2)}" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
@@ -1405,7 +1425,7 @@ function editTrackedItem(id){
     </div>
   `;
   document.body.appendChild(overlay);
-  setTimeout(() => { const el = document.getElementById('target-price-input'); if(el) el.focus(); }, 50);
+  initModalA11y(overlay);
 }
 
 async function confirmEditTrackedItem(id){
@@ -1782,7 +1802,7 @@ function promptTrackProduct(name, brand, code){
   overlay.innerHTML = `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
-      <h3 class="modal-title">${name}</h3>
+      <h3 class="modal-title" id="modal-a11y-title">${name}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
       <input type="number" id="target-price-input" value="5.00" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
@@ -1792,12 +1812,44 @@ function promptTrackProduct(name, brand, code){
     </div>
   `;
   document.body.appendChild(overlay);
-  setTimeout(() => document.getElementById('target-price-input').focus(), 50);
+  initModalA11y(overlay);
+}
+
+function initModalA11y(overlay){
+  const previouslyFocused = document.activeElement;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'modal-a11y-title');
+  const focusables = overlay.querySelectorAll('button, input, [tabindex]');
+  if(focusables.length) focusables[0].focus();
+  function trap(e){
+    if(e.key === 'Escape'){
+      overlay.querySelector('.modal-btn-secondary, .chip')?.click();
+    }else if(e.key === 'Tab' && focusables.length){
+      const first = focusables[0];
+      const last = focusables[focusables.length-1];
+      if(e.shiftKey && document.activeElement === first){
+        e.preventDefault();
+        last.focus();
+      }else if(!e.shiftKey && document.activeElement === last){
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+  overlay.addEventListener('keydown', trap);
+  overlay._a11yCleanup = () => {
+    overlay.removeEventListener('keydown', trap);
+    if(previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
+  };
 }
 
 function closeTrackModal(){
   const overlay = document.getElementById('track-modal-overlay');
-  if(overlay) overlay.remove();
+  if(overlay){
+    if(overlay._a11yCleanup) overlay._a11yCleanup();
+    overlay.remove();
+  }
 }
 
 function confirmTrackProduct(name, brand, code){
