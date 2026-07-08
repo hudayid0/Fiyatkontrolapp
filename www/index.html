@@ -878,6 +878,12 @@ const TRANSLATIONS = {
   rateNeverBtn: {tr:'Bir daha sorma', en:"Don't ask again", ja:'今後表示しない', zh:'不再询问'},
   themeToggleAria: {tr:'Tema değiştir', en:'Change theme', ja:'テーマを変更', zh:'切换主题'},
   ariaSwap: {tr:'Para birimlerinin yönünü değiştir', en:'Swap currency direction', ja:'通貨の方向を切り替え', zh:'切换货币方向'},
+  onboardingTitle: {tr:'Fiyatla\'ya hoş geldin', en:'Welcome to Fiyatla', ja:'Fiyatlaへようこそ', zh:'欢迎使用Fiyatla'},
+  onboardingIntro: {tr:'Üç şeyi hızlıca yapabilirsin:', en:'Here are three things you can do:', ja:'できることは主に3つです:', zh:'您可以快速完成三件事:'},
+  onboardingPoint1: {tr:'💱 Bir tutarı istediğin para birimine anında çevir', en:'💱 Instantly convert an amount to any currency', ja:'💱 金額を好きな通貨に即座に変換', zh:'💱 立即将金额转换为任意货币'},
+  onboardingPoint2: {tr:'📷 Barkod tarayarak ya da ürün adıyla arayarak ürün bul', en:'📷 Find a product by scanning a barcode or searching by name', ja:'📷 バーコードをスキャンするか商品名で検索して商品を見つける', zh:'📷 通过扫描条码或按名称搜索来查找商品'},
+  onboardingPoint3: {tr:'🔔 Beğendiğin ürünleri takip listene ekle, hatırlatma al', en:'🔔 Add products you like to your watchlist and get reminders', ja:'🔔 気に入った商品をウォッチリストに追加してリマインダーを受け取る', zh:'🔔 将您喜欢的商品添加到关注列表并接收提醒'},
+  onboardingStartBtn: {tr:'Başlayalım', en:"Let's go", ja:'始めましょう', zh:'开始使用'},
 };
 
 const TRANSLATIONS_FN = {
@@ -1089,6 +1095,9 @@ function renderHome(){
         <p>${t('card3Desc')}</p>
       </div>
     </main>
+    <div style="text-align:center; padding:8px 20px;">
+      <button class="chip" onclick="testCrashlytics()">🧪 Test Crash (debug - sonra kaldirilacak)</button>
+    </div>
     <footer>${t('footerHome')}</footer>
   `;
 }
@@ -1339,6 +1348,47 @@ function resetCamBox(){
 }
 
 // ---- Product lookup (Open Food Facts - real API) ----
+function testCrashlytics(){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseCrashlytics){
+    window.Capacitor.Plugins.FirebaseCrashlytics.crash({message: 'Test crash from Fiyatla'});
+  }else{
+    alert('FirebaseCrashlytics eklentisi bulunamadi. Native tarafta kurulu mu kontrol et.');
+  }
+}
+
+function maybeShowOnboarding(openCount){
+  if(openCount !== 1) return;
+  showOnboardingModal();
+}
+
+function showOnboardingModal(){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'onboarding-modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <p class="eyebrow" id="modal-a11y-title">👋 ${t('onboardingTitle')}</p>
+      <p class="modal-sub">${t('onboardingIntro')}</p>
+      <p class="modal-sub" style="margin-top:8px;">${t('onboardingPoint1')}</p>
+      <p class="modal-sub" style="margin-top:8px;">${t('onboardingPoint2')}</p>
+      <p class="modal-sub" style="margin-top:8px;">${t('onboardingPoint3')}</p>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="modal-btn-primary" style="width:100%;" onclick="closeOnboardingModal()">${t('onboardingStartBtn')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  initModalA11y(overlay);
+}
+
+function closeOnboardingModal(){
+  const el = document.getElementById('onboarding-modal-overlay');
+  if(el){
+    if(el._a11yCleanup) el._a11yCleanup();
+    el.remove();
+  }
+}
+
 function getAppOpenCount(){
   let count = 1;
   try{
@@ -1523,8 +1573,7 @@ async function lookupBarcode(){
     return;
   }
   if(!isValidBarcodeChecksum(code)){
-    box.innerHTML = `<div class="error">${t('invalidBarcodeChecksum')}</div>`;
-    return;
+    console.log('Checksum uyusmuyor, farkli bir barkod standardi olabilir (orn. Code128) - arama yine de deneniyor.');
   }
   addToHistory('barcode', code);
   const cached = getCachedProduct(code);
@@ -1901,7 +1950,7 @@ async function initAdMob(){
     admobReady = true;
     setupAdSizeListener();
     showBannerAd();
-    if(shouldShowInterstitial()) showInterstitialOnce();
+    if(window.fiyatlaOpenCount > 1 && shouldShowInterstitial()) showInterstitialOnce();
   }catch(e){
     console.log('AdMob baslatilamadi:', e.message);
   }
@@ -2000,6 +2049,7 @@ function shouldShowInterstitial(){
 }
 
 window.fiyatlaOpenCount = getAppOpenCount();
+maybeShowOnboarding(window.fiyatlaOpenCount);
 initAdMob();
 fetchLiveRates();
 setupBackButton();
