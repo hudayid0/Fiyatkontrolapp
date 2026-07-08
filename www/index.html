@@ -986,8 +986,8 @@ function renderLangBar(){
     {code:'zh', flag:'🇨🇳', name:'中文'},
   ];
   return `<div class="lang-bar">
+    <button class="theme-btn" onclick="goTo('settings')" aria-label="${t('settingsMenuLabel')}">ℹ️</button>
     <button class="theme-btn" onclick="cycleTheme()" aria-label="${t('themeToggleAria')}">${themeIcon()}</button>
-    <button class="theme-btn" onclick="goTo('settings')" aria-label="${t('settingsMenuLabel')}">⚙️</button>
     ${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')" aria-label="${l.name}">${l.flag}</button>`).join('')}
   </div>`;
 }
@@ -1131,9 +1131,11 @@ function renderSettings(){
       <div class="card" style="margin-top:12px;">
         <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="window.open('https://hudayid0.github.io/Fiyatkontrolapp/terms.html', '_system')">${t('termsLink')}</button>
       </div>
+      ${window.adConsentAvailable ? `
       <div class="card" style="margin-top:12px;">
         <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="manageAdPrivacy()">${t('managePrivacyBtn')}</button>
       </div>
+      ` : ''}
       <div class="card" style="margin-top:12px;">
         <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
         <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
@@ -2246,9 +2248,11 @@ async function showInterstitialOnce(){
 }
 
 async function handleConsent(){
+  window.adConsentAvailable = false;
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
   try{
     const consentInfo = await window.Capacitor.Plugins.AdMob.requestConsentInfo();
+    window.adConsentAvailable = !!consentInfo.isConsentFormAvailable;
     if(consentInfo.isConsentFormAvailable && consentInfo.status === 'REQUIRED'){
       await window.Capacitor.Plugins.AdMob.showConsentForm();
     }
