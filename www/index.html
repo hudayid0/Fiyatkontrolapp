@@ -1024,6 +1024,16 @@ function applyTheme(){
   }else{
     app.classList.remove('light-theme');
   }
+  updateStatusBar();
+}
+
+async function updateStatusBar(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.StatusBar) return;
+  try{
+    const isLight = resolvedTheme() === 'light';
+    await window.Capacitor.Plugins.StatusBar.setStyle({ style: isLight ? 'LIGHT' : 'DARK' });
+    await window.Capacitor.Plugins.StatusBar.setBackgroundColor({ color: isLight ? '#FAF8F4' : '#0F1B1E' });
+  }catch(e){}
 }
 
 function cycleTheme(){
@@ -2281,6 +2291,7 @@ const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-3346239396398803/8620837997';
 async function showInterstitialOnce(){
   if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
   try{
+    window.__interstitialActive = true;
     await window.Capacitor.Plugins.AdMob.prepareInterstitial({
       adId: ADMOB_INTERSTITIAL_ID,
       isTesting: false,
@@ -2289,12 +2300,29 @@ async function showInterstitialOnce(){
       try{
         await window.Capacitor.Plugins.AdMob.showInterstitial();
       }catch(e){
+        window.__interstitialActive = false;
         console.log('Interstitial gosterilemedi:', e.message);
       }
     }, 1500);
   }catch(e){
+    window.__interstitialActive = false;
     console.log('Interstitial hazirlanamadi:', e.message);
   }
+}
+
+function setupInterstitialListener(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  window.Capacitor.Plugins.AdMob.addListener('interstitialAdDismissed', () => {
+    window.__interstitialActive = false;
+    if(window.__pendingRatePromptCount !== null && window.__pendingRatePromptCount !== undefined){
+      const count = window.__pendingRatePromptCount;
+      window.__pendingRatePromptCount = null;
+      maybeShowRatePrompt(count);
+    }
+  });
+  window.Capacitor.Plugins.AdMob.addListener('interstitialAdFailedToShow', () => {
+    window.__interstitialActive = false;
+  });
 }
 
 async function handleConsent(){
@@ -2312,7 +2340,10 @@ async function handleConsent(){
 }
 
 async function initAdMob(){
-  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob){
+    maybeShowOnboarding(window.fiyatlaOpenCount);
+    return;
+  }
   try{
     await window.Capacitor.Plugins.AdMob.initialize({
       testingDevices: [],
@@ -2320,11 +2351,14 @@ async function initAdMob(){
     });
     admobReady = true;
     await handleConsent();
+    maybeShowOnboarding(window.fiyatlaOpenCount);
     setupAdSizeListener();
+    setupInterstitialListener();
     showBannerAd();
     if(window.fiyatlaOpenCount > 1 && shouldShowInterstitial()) showInterstitialOnce();
   }catch(e){
     console.log('AdMob baslatilamadi:', e.message);
+    maybeShowOnboarding(window.fiyatlaOpenCount);
   }
 }
 
@@ -2441,15 +2475,21 @@ window.addEventListener('unhandledrejection', (event) => {
   }catch(e){}
 });
 
+window.__pendingRatePromptCount = null;
 window.fiyatlaOpenCount = getAppOpenCount();
 cleanupExpiredCache();
-maybeShowOnboarding(window.fiyatlaOpenCount);
 initAdMob();
 fetchLiveRates();
 setupBackButton();
 setupDeepLinks();
 checkForUpdate();
-setTimeout(() => maybeShowRatePrompt(window.fiyatlaOpenCount), 2500);
+setTimeout(() => {
+  if(window.__interstitialActive){
+    window.__pendingRatePromptCount = window.fiyatlaOpenCount;
+  }else{
+    maybeShowRatePrompt(window.fiyatlaOpenCount);
+  }
+}, 2500);
 
 let lastBackPress = 0;
 
@@ -2478,14 +2518,24 @@ function exitToastMessage(){
   return msgs[state.lang] || msgs.tr;
 }
 
-function setupDeepLinks(){
+function handleDeepLinkUrl(url){
+  if(!url) return;
+  if(url.indexOf('scan') !== -1) goTo('scan');
+  else if(url.indexOf('convert') !== -1) goTo('convert');
+  else if(url.indexOf('tracking') !== -1) goTo('tracking');
+}
+
+async function setupDeepLinks(){
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
   window.Capacitor.Plugins.App.addListener('appUrlOpen', (data) => {
-    if(!data || !data.url) return;
-    if(data.url.indexOf('scan') !== -1) goTo('scan');
-    else if(data.url.indexOf('convert') !== -1) goTo('convert');
-    else if(data.url.indexOf('tracking') !== -1) goTo('tracking');
+    handleDeepLinkUrl(data && data.url);
   });
+  try{
+    const launch = await window.Capacitor.Plugins.App.getLaunchUrl();
+    if(launch && launch.url){
+      handleDeepLinkUrl(launch.url);
+    }
+  }catch(e){}
 }
 
 function setupBackButton(){
