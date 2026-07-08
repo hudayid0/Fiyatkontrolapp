@@ -4,4 +4,10 @@
     <string name="title_activity_main">Fiyatla</string>
     <string name="package_name">com.hudayi.fiyatkontrol</string>
     <string name="custom_url_scheme">com.hudayi.fiyatkontrol</string>
+    <string name="shortcut_scan_short">Tara</string>
+    <string name="shortcut_scan_long">Barkod Tara</string>
+    <string name="shortcut_convert_short">Çevir</string>
+    <string name="shortcut_convert_long">Döviz Çevir</string>
+    <string name="shortcut_tracking_short">Takip</string>
+    <string name="shortcut_tracking_long">Takip Listem</string>
 </resources>
