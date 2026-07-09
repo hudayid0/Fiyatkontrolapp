@@ -1340,7 +1340,7 @@ function renderConvert(){
 
 function renderScan(){
   const mode = state.searchMode || 'barcode';
-  const history = state.searchHistory || [];
+  const history = getSearchHistory();
   return `
     <header class="top">
       <button class="backbtn" onclick="goTo('home')"><span class="back-arrow"></span> ${t('back')}</button>
@@ -1440,10 +1440,10 @@ function setSearchMode(mode){
 }
 
 function addToHistory(mode, value){
-  if(!state.searchHistory) state.searchHistory = [];
-  state.searchHistory = state.searchHistory.filter(h => h.value !== value);
-  state.searchHistory.unshift({mode, value});
-  state.searchHistory = state.searchHistory.slice(0, 6);
+  let history = getSearchHistory().filter(h => h.value !== value);
+  history.unshift({mode, value});
+  history = history.slice(0, 6);
+  saveSearchHistory(history);
 }
 
 function rerunHistory(mode, value){
@@ -1819,11 +1819,13 @@ async function confirmEditTrackedItem(id){
 
 async function exportBackup(){
   const items = getTrackedItems();
+  const history = getSearchHistory();
   const backupObj = {
     app: 'fiyatla',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     tracked: items,
+    searchHistory: history,
   };
   const text = btoa(unescape(encodeURIComponent(JSON.stringify(backupObj))));
   try{
@@ -1880,6 +1882,7 @@ function confirmImportBackup(){
       throw new Error('gecersiz');
     }
     saveTrackedItems(data.tracked);
+    saveSearchHistory(Array.isArray(data.searchHistory) ? data.searchHistory : []);
     closeImportModal();
     showToast(t('importSuccess'));
     render();
@@ -2258,6 +2261,21 @@ function nextNotifId(){
 
 function saveTrackedItems(items){
   localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+}
+
+const SEARCH_HISTORY_KEY = 'fiyatla_search_history';
+
+function getSearchHistory(){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(e){
+    return [];
+  }
+}
+
+function saveSearchHistory(history){
+  try{ localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history)); }catch(e){}
 }
 
 async function requestNotificationPermission(){
