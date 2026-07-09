@@ -400,6 +400,26 @@
   .match-high{background:rgba(45,212,191,0.18); color:var(--teal);}
   .match-mid{background:rgba(201,162,39,0.18); color:var(--gold-soft);}
   .cheapest{color:var(--teal); font-weight:600;}
+  .data-badge{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+    font-weight:600;
+    padding:10px 12px;
+    border-radius:12px;
+    margin-bottom:10px;
+  }
+  .data-badge-real{
+    background:rgba(45,212,191,0.15);
+    color:var(--teal);
+    border:1px solid rgba(45,212,191,0.35);
+  }
+  .data-badge-fake{
+    background:rgba(232,115,74,0.15);
+    color:#E8734A;
+    border:1px solid rgba(232,115,74,0.4);
+  }
   .note{
     font-size:12px;
     color:var(--text-dim);
@@ -871,6 +891,7 @@ const TRANSLATIONS = {
   productNameLabel: {de:'Produktname', tr:'Ürün adı', en:'Product name', ja:'商品名', zh:'商品名称'},
   enterBarcodeMsg: {de:'Bitte gib einen Barcode ein.', tr:'Bir barkod numarası gir.', en:'Enter a barcode number.', ja:'バーコード番号を入力してください。', zh:'请输入条码号。'},
   searchingProduct: {de:'Produkt wird gesucht...', tr:'Ürün aranıyor...', en:'Searching product...', ja:'商品を検索中...', zh:'正在搜索商品...'},
+  comparingPrices: {de:'Preise werden verglichen...', tr:'Fiyatlar karşılaştırılıyor...', en:'Comparing prices...', ja:'価格を比較中...', zh:'正在比较价格...'},
   barcodeNotFoundMsg: {de:'Produkt nicht gefunden.', tr:'Bu barkod veritabanında bulunamadı. Ürün adını biliyorsan "Ürün Adı" sekmesinden aramayı dene.', en:'This barcode was not found. If you know the product name, try the "Product Name" tab.', ja:'このバーコードは見つかりませんでした。商品名がわかる場合は「商品名」タブでお試しください。', zh:'未找到此条码。如果您知道商品名称,请尝试"商品名称"标签。'},
   enterProductNameMsg: {de:'Bitte gib einen Produktnamen ein.', tr:'Bir ürün adı gir.', en:'Enter a product name.', ja:'商品名を入力してください。', zh:'请输入商品名称。'},
   searchingText: {de:'Wird gesucht...', tr:'Aranıyor...', en:'Searching...', ja:'検索中...', zh:'搜索中...'},
@@ -885,6 +906,10 @@ const TRANSLATIONS = {
   compareStoreCountry: {de:'Geschaeft / Land', tr:'Mağaza / Ülke', en:'Store / Country', ja:'店舗・国', zh:'商店/国家'},
   comparePrice: {de:'Preis', tr:'Fiyat', en:'Price', ja:'価格', zh:'价格'},
   compareNote1: {de:'Diese Vergleichstabelle nutzt Beispiel-(simulierte) Daten. Fuer echte Preise muessten offizielle Store-APIs angebunden werden.', tr:'Not: Bu karşılaştırma tablosu örnek (simüle) verilerle çalışıyor. Gerçek fiyatlar için resmi mağaza API\'lerinin bağlanması gerekiyor.', en:'Note: This comparison table uses sample (simulated) data. Real prices require connecting official store APIs.', ja:'注: この比較表はサンプル(シミュレーション)データを使用しています。実際の価格には公式店舗APIの連携が必要です。', zh:'注:此比较表使用示例(模拟)数据。真实价格需要连接官方商店API。'},
+  realDataBadge: {de:'✅ Echte Haendlerdaten (ueber UPCitemdb)', tr:'✅ Gerçek satıcı verisi (UPCitemDB üzerinden)', en:'✅ Real merchant data (via UPCitemdb)', ja:'✅ 実際の販売者データ(UPCitemdb経由)', zh:'✅ 真实商家数据(通过UPCitemdb)'},
+  fakeDataBadge: {de:'🧪 BEISPIELDATEN — kein echter Preis gefunden', tr:'🧪 ÖRNEK VERİ — gerçek fiyat bulunamadı', en:'🧪 SAMPLE DATA — no real price found', ja:'🧪 サンプルデータ — 実際の価格は見つかりませんでした', zh:'🧪 示例数据——未找到真实价格'},
+  trackingRealPriceActive: {de:'✅ Echte Preisverfolgung aktiv', tr:'✅ Gerçek fiyat takibi aktif', en:'✅ Real price tracking active', ja:'✅ 実際の価格追跡が有効', zh:'✅ 真实价格追踪已启用'},
+  trackingReminderOnly: {de:'⏰ Nur Erinnerung, keine automatischen Preisdaten', tr:'⏰ Sadece hatırlatma, otomatik fiyat verisi yok', en:'⏰ Reminder only, no automatic price data', ja:'⏰ リマインダーのみ、自動価格データなし', zh:'⏰ 仅提醒,无自动价格数据'},
   compareNote2: {de:'Preise koennen je nach Geschaeft variieren.', tr:'"Git" linkleri affiliate/ortaklık bağlantılarıdır — bir mağazadan alışveriş yaparsan küçük bir komisyon kazanabiliriz, senin ödediğin fiyatı değiştirmez.', en:'"Go" links are affiliate links — if you shop through a store we may earn a small commission, at no extra cost to you.', ja:'「移動」リンクはアフィリエイトリンクです。購入すると少額の手数料を得ることがありますが、あなたの支払額は変わりません。', zh:'"前往"链接为联盟链接——如果您通过商店购物,我们可能获得少量佣金,不会增加您的费用。'},
   goBtn: {de:'Los', tr:'Git', en:'Go', ja:'移動', zh:'前往'},
   galleryBtn: {de:'Aus Galerie waehlen', tr:'Galeriden Seç', en:'Choose from Gallery', ja:'ギャラリーから選択', zh:'从相册选择'},
@@ -1951,6 +1976,36 @@ function setCachedProduct(code, product){
   }catch(e){}
 }
 
+async function fetchRealOffers(code){
+  if(!code) return null;
+  try{
+    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+    if(!res.ok) return null;
+    const data = await res.json();
+    if(!data.items || data.items.length === 0) return null;
+    const offers = data.items[0].offers || [];
+    return offers.length > 0 ? offers : null;
+  }catch(e){
+    return null;
+  }
+}
+
+function realOffersToEur(offers){
+  const rows = [];
+  for(const offer of offers){
+    if(!offer || typeof offer.price !== 'number' || offer.price <= 0) continue;
+    const currency = (offer.currency || 'USD').toUpperCase();
+    if(!RATES_TO_EUR[currency]) continue;
+    rows.push({
+      merchant: offer.merchant || offer.domain || '—',
+      priceEur: convertAmount(offer.price, currency, 'EUR'),
+      url: offer.link || '#',
+    });
+  }
+  rows.sort((a,b) => a.priceEur - b.priceEur);
+  return rows;
+}
+
 async function tryUpcItemDb(code){
   try{
     const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
@@ -2061,7 +2116,6 @@ function renderProductResult(p, code){
   const name = escapeHtml(p.product_name || p.generic_name || 'Bilinmeyen ürün');
   const brand = escapeHtml(p.brands || '—');
   const img = p.image_front_small_url || p.image_url || '';
-  const comparison = buildComparison(name, brand);
   const safeName = name.replace(/'/g, "\\'");
   const safeBrand = brand.replace(/'/g, "\\'");
   box.innerHTML = `
@@ -2077,11 +2131,16 @@ function renderProductResult(p, code){
       </div>
     </div>
     <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">${t('trackThisProductBtn')}</button>
-    ${comparison}
+    <div id="comparison-area"><div class="result"><span class="spinner"></span>${t('comparingPrices')}</div></div>
   `;
 
   const shareBtn2 = document.getElementById('product-share-btn');
   if(shareBtn2) shareBtn2.onclick = () => shareText(`${name} - ${brand} (Fiyatla ile bulundu)`);
+
+  buildComparison(name, brand, code).then(html => {
+    const area = document.getElementById('comparison-area');
+    if(area) area.innerHTML = html;
+  });
 }
 
 // ---- Fuzzy matching demo ----
@@ -2131,7 +2190,31 @@ function renderAdBanner(){
   `;
 }
 
-function buildComparison(name, brand){
+async function buildComparison(name, brand, code){
+  const realOffers = await fetchRealOffers(code);
+  const realRows = realOffers ? realOffersToEur(realOffers) : [];
+
+  if(realRows.length > 0){
+    const minPrice = realRows[0].priceEur;
+    const rows = realRows.map(r => `
+      <tr>
+        <td class="name-col">${escapeHtml(r.merchant)}</td>
+        <td class="${r.priceEur===minPrice?'cheapest':''}">€ ${formatNumber(r.priceEur, 2)}</td>
+        <td>
+          <a class="go-btn" href="${r.url}" target="_blank" rel="noopener">${t('goBtn')}</a>
+        </td>
+      </tr>
+    `).join('');
+    return `
+      <div class="data-badge data-badge-real">${t('realDataBadge')}</div>
+      <table class="compare">
+        <thead><tr><th>${t('compareStoreCountry')}</th><th>${t('comparePrice')}</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${renderAdBanner()}
+    `;
+  }
+
   const query = `${brand} ${name}`.trim();
   const variants = [
     {country:'🇩🇪 ' + t('countryGermany'), store:'amazon.de', label: `${brand} ${name}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
@@ -2157,6 +2240,7 @@ function buildComparison(name, brand){
     </tr>
   `).join('');
   return `
+    <div class="data-badge data-badge-fake">${t('fakeDataBadge')}</div>
     <table class="compare">
       <thead><tr><th>${t('compareStoreCountry')}</th><th>${t('comparePrice')}</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
@@ -2190,6 +2274,11 @@ function renderTracking(){
           <div style="flex:1;">
             <div class="pname">${item.name}</div>
             <div class="pbrand">${item.brand} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
+            <div style="margin-top:4px;">
+              ${item.hasRealPriceData
+                ? `<span class="match-tag match-high">${t('trackingRealPriceActive')}</span>`
+                : `<span class="match-tag match-mid">${t('trackingReminderOnly')}</span>`}
+            </div>
           </div>
           <button class="go-btn" onclick="editTrackedItem('${item.id}')">${t('editBtn')}</button>
           <button class="go-btn" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
@@ -2304,12 +2393,15 @@ async function scheduleTrackingNotification(name, targetPrice, { onError, existi
 async function trackProduct(name, brand, code, targetPrice){
   const items = getTrackedItems();
   const id = `${code}_${Date.now()}`;
-  const notifId = await scheduleTrackingNotification(name, targetPrice, {
-    existingItems: items,
-    onError: (e) => showToast(td('trackScheduleError', e.message))
-  });
+  const [notifId, realOffers] = await Promise.all([
+    scheduleTrackingNotification(name, targetPrice, {
+      existingItems: items,
+      onError: (e) => showToast(td('trackScheduleError', e.message))
+    }),
+    fetchRealOffers(code),
+  ]);
 
-  items.push({ id, name, brand, code, targetPrice, notifId });
+  items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: !!realOffers });
   saveTrackedItems(items);
   logAnalyticsEvent('product_tracked', { barcode: code, target_price: targetPrice });
   if(notifId){
