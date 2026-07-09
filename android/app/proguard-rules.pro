@@ -19,3 +19,59 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ============================================================
+# Capacitor core
+# Plugin methods are invoked via reflection based on the
+# @CapacitorPlugin/@PluginMethod annotations, so both the
+# annotated classes/methods and the Bridge/Plugin base classes
+# must survive shrinking and renaming.
+# ============================================================
+-keep @com.getcapacitor.annotation.CapacitorPlugin public class * {
+    @com.getcapacitor.annotation.PermissionCallback <methods>;
+    @com.getcapacitor.annotation.ActivityCallback <methods>;
+    @com.getcapacitor.annotation.Permission <methods>;
+    @com.getcapacitor.PluginMethod public <methods>;
+}
+-keep public class * extends com.getcapacitor.Plugin { *; }
+-keep class com.getcapacitor.** { *; }
+
+# ============================================================
+# @capacitor/app
+# ============================================================
+-keep class com.capacitorjs.plugins.app.** { *; }
+
+# ============================================================
+# @capacitor/local-notifications
+# TimedNotificationPublisher, NotificationDismissReceiver and
+# LocalNotificationRestoreReceiver are looked up by fully
+# qualified class name from AndroidManifest.xml (BroadcastReceiver
+# components) and from serialized Intent extras - if R8 renames or
+# strips them, scheduled notifications silently stop firing at
+# runtime even though the build succeeds.
+# ============================================================
+-keep class com.capacitorjs.plugins.localnotifications.** { *; }
+
+# ============================================================
+# @capacitor/status-bar
+# ============================================================
+-keep class com.capacitorjs.plugins.statusbar.** { *; }
+
+# ============================================================
+# @capacitor-community/admob + underlying Google Mobile Ads SDK
+# ============================================================
+-keep class com.getcapacitor.community.admob.** { *; }
+-keep class com.google.android.gms.ads.** { *; }
+-keep interface com.google.android.gms.ads.** { *; }
+
+# ============================================================
+# @capacitor-firebase/crashlytics + underlying Firebase Crashlytics SDK
+# Keep exception types and source/line info so crash reports stay
+# symbolicated, and keep the plugin bridge so JS-triggered crash
+# logging keeps working.
+# ============================================================
+-keep class io.capawesome.capacitorjs.plugins.firebase.crashlytics.** { *; }
+-keep class com.google.firebase.crashlytics.** { *; }
+-keepattributes SourceFile,LineNumberTable
+-keepattributes *Annotation*
+-keep public class * extends java.lang.Exception
