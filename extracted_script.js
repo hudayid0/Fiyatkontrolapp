@@ -16,6 +16,17 @@ function ccyName(code){
 }
 
 const RATE_DATE = '2 Temmuz 2026';
+
+function rateDateLabel(){
+  const dates = {
+    tr: '2 Temmuz 2026',
+    en: 'July 2, 2026',
+    de: '2. Juli 2026',
+    ja: '2026年7月2日',
+    zh: '2026年7月2日',
+  };
+  return dates[state.lang] || dates.tr;
+}
 const RATES_TO_EUR = {
   EUR: 1,
   USD: 0.8773,
@@ -109,11 +120,11 @@ function rateStatusLabel(){
     };
     return labelsCache[state.lang] || labelsCache.tr;
   }
-  const labels2 = {de: `Fester Kurs (offline) · ${RATE_DATE}`, 
-    tr: `Sabit kur (bağlantı yok) · ${RATE_DATE}`,
-    en: `Fixed rate (offline) · ${RATE_DATE}`,
-    ja: `固定レート(オフライン) · ${RATE_DATE}`,
-    zh: `固定汇率(离线) · ${RATE_DATE}`,
+  const labels2 = {de: `Fester Kurs (offline) · ${rateDateLabel()}`, 
+    tr: `Sabit kur (bağlantı yok) · ${rateDateLabel()}`,
+    en: `Fixed rate (offline) · ${rateDateLabel()}`,
+    ja: `固定レート(オフライン) · ${rateDateLabel()}`,
+    zh: `固定汇率(离线) · ${rateDateLabel()}`,
   };
   return labels2[state.lang] || labels2.tr;
 }
@@ -262,6 +273,7 @@ const TRANSLATIONS = {
   countryTurkey: {tr:'Türkiye', en:'Turkey', de:'Tuerkei', ja:'トルコ', zh:'土耳其'},
   rateLabel: {tr:'kur', en:'rate', de:'Kurs', ja:'レート', zh:'汇率'},
   trackThisProductBtn: {tr:'🔔 Bu ürünü takip et', en:'🔔 Track this product', de:'🔔 Dieses Produkt verfolgen', ja:'🔔 この商品を追跡', zh:'🔔 关注此商品'},
+  notifTitle: {tr:'Fiyat Takibi - Fiyatla', en:'Price Tracking - Fiyatla', de:'Preisverfolgung - Fiyatla', ja:'価格追跡 - Fiyatla', zh:'价格追踪 - Fiyatla'},
 };
 
 const TRANSLATIONS_FN = {
@@ -456,6 +468,7 @@ function render(){
   const app = document.getElementById('app');
   try{
     applyTheme();
+    if(navigator.onLine === false) showOfflineBanner();
     let content = '';
     if(state.screen === 'home') content = renderHome();
     else if(state.screen === 'convert') content = renderConvert();
@@ -962,12 +975,14 @@ function dismissUpdateBanner(version){
 }
 
 function showOfflineBanner(){
-  if(document.getElementById('offline-banner')) return;
-  const el = document.createElement('div');
-  el.id = 'offline-banner';
-  el.style.cssText = 'position:fixed; bottom:0; left:0; right:0; background:var(--danger); color:#fff; padding:10px 16px; text-align:center; font-size:13px; z-index:1900;';
+  let el = document.getElementById('offline-banner');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'offline-banner';
+    el.style.cssText = 'position:fixed; bottom:0; left:0; right:0; background:var(--danger); color:#fff; padding:10px 16px; text-align:center; font-size:13px; z-index:1900;';
+    document.body.appendChild(el);
+  }
   el.textContent = t('offlineMessage');
-  document.body.appendChild(el);
 }
 
 function hideOfflineBanner(){
@@ -1096,7 +1111,7 @@ async function confirmEditTrackedItem(id){
       await window.Capacitor.Plugins.LocalNotifications.schedule({
         notifications: [{
           id: newNotifId,
-          title: 'Fiyat Takibi - Fiyatla',
+          title: t('notifTitle'),
           body: td('notifBody', item.name, formatNumber(target, 2)),
           schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
         }]
@@ -1574,7 +1589,7 @@ async function trackProduct(name, brand, code, targetPrice){
     await window.Capacitor.Plugins.LocalNotifications.schedule({
       notifications: [{
         id: notifId,
-        title: 'Fiyat Takibi - Fiyatla',
+        title: t('notifTitle'),
         body: td('notifBody', name, formatNumber(targetPrice, 2)),
         schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
       }]
