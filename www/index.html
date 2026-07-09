@@ -846,7 +846,7 @@ const TRANSLATIONS = {
   trackingEyebrow: {de:'Preisverfolgung', tr:'03 · Takip Listem', en:'03 · My Watchlist', ja:'03・ウォッチリスト', zh:'03・我的关注列表'},
   trackingTitle: {de:'Meine Watchliste', tr:'🔔 Fiyat hatırlatıcıları', en:'🔔 Price reminders', ja:'🔔 価格リマインダー', zh:'🔔 价格提醒'},
   trackingSub: {de:'Regelmaessige Erinnerungsbenachrichtigungen fuer verfolgte Produkte.', tr:'Takip ettiğin ürünler için düzenli aralıklarla hatırlatma bildirimi gönderilir.', en:'You get reminder notifications at regular intervals for tracked products.', ja:'追跡商品について定期的にリマインダー通知が送られます。', zh:'系统会定期为您关注的商品发送提醒通知。'},
-  trackEmpty: {de:'Du verfolgst noch keine Produkte.', tr:'Henüz takip ettiğin bir ürün yok.', en:'No tracked products yet.', ja:'まだ追跡中の商品はありません。', zh:'暂无关注的商品。'},
+  trackEmpty: {tr:'Henüz takip ettiğin bir ürün yok. Bir ürün aradıktan sonra sonuç ekranındaki "🔔 Bu ürünü takip et" butonuna dokunarak ekleyebilirsin.', en:'No tracked products yet. After finding a product, tap the "🔔 Track this product" button on the results screen to add it.', de:'Du verfolgst noch keine Produkte. Nachdem du ein Produkt gefunden hast, tippe auf der Ergebnisseite auf "🔔 Dieses Produkt verfolgen", um es hinzuzufuegen.', ja:'追跡中の商品はまだありません。商品を検索した後、結果画面の「🔔 この商品を追跡」ボタンをタップして追加できます。', zh:'暂无关注的商品。搜索到商品后,点击结果页面上的"🔔 关注此商品"按钮即可添加。'},
   dropBtn: {de:'Entfernen', tr:'Bırak', en:'Remove', ja:'削除', zh:'移除'},
   footerTracking: {de:'Erinnerungen werden lokal auf deinem Geraet geplant', tr:'Bildirimler: Capacitor Local Notifications', en:'Notifications: Capacitor Local Notifications', ja:'通知: Capacitor Local Notifications', zh:'通知: Capacitor Local Notifications'},
 
@@ -2169,7 +2169,7 @@ function renderTracking(){
     </header>
     <main>
       ${tracked.length === 0 ? `
-        <div class="note">Henüz takip ettiğin bir ürün yok. Bir ürün aradıktan sonra sonuç ekranındaki "🔔 Bu ürünü takip et" butonuna dokunarak ekleyebilirsin.</div>
+        <div class="note">${t('trackEmpty')}</div>
       ` : tracked.map(item => `
         <div class="product-card">
           <div style="flex:1;">
