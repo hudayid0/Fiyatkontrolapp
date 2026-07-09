@@ -678,7 +678,7 @@
 <div class="app" id="app"></div>
 
 <script>
-const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY'];
+const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY','AED'];
 
 const CURRENCY_NAMES = {
   TRY: {de:'Tuerkische Lira', tr:'Türk Lirası', en:'Turkish Lira', ja:'トルコリラ', zh:'土耳其里拉'},
@@ -688,7 +688,15 @@ const CURRENCY_NAMES = {
   JPY: {de:'Japanischer Yen', tr:'Japon Yeni', en:'Japanese Yen', ja:'日本円', zh:'日元'},
   CHF: {de:'Schweizer Franken', tr:'İsviçre Frangı', en:'Swiss Franc', ja:'スイスフラン', zh:'瑞士法郎'},
   CNY: {de:'Chinesischer Yuan', tr:'Çin Yuanı', en:'Chinese Yuan', ja:'中国元', zh:'人民币'},
+  AED: {de:'VAE-Dirham', tr:'BAE Dirhemi', en:'UAE Dirham', ja:'UAEディルハム', zh:'阿联酋迪拉姆'},
 };
+
+// AED, ABD Dolarina 1 USD = 3.6725 AED sabit kuruyla baglidir (BAE Merkez
+// Bankasi'nin 1997'den beri uyguladigi resmi sabit kur - piyasada dalgalanmaz).
+// Frankfurter API AED'yi desteklemedigi icin canli kur cekilemiyor; bunun
+// yerine AED'nin EUR karsiligi, her kur guncellemesinde bu sabit pariteden
+// (guncel USD kuru uzerinden) hesaplaniyor.
+const AED_USD_PEG = 3.6725;
 function ccyName(code){
   const n = CURRENCY_NAMES[code];
   return n ? (n[state.lang] || n.tr) : code;
@@ -712,7 +720,12 @@ const RATES_TO_EUR = {
   CHF: 1.0870,
   TRY: 0.018778,
   CNY: 0.1288,
+  AED: 0.8773 / AED_USD_PEG,
 };
+
+function syncAedFromPeg(){
+  RATES_TO_EUR.AED = RATES_TO_EUR.USD / AED_USD_PEG;
+}
 
 let ratesLive = false;
 let ratesFromCache = false;
@@ -755,6 +768,7 @@ async function fetchLiveRates(){
     ratesLive = true;
     ratesFromCache = false;
     ratesLastUpdated = new Date();
+    syncAedFromPeg();
     saveRatesToCache();
   }catch(e){
     ratesLive = false;
@@ -766,6 +780,7 @@ async function fetchLiveRates(){
       }
       ratesFromCache = true;
       ratesLastUpdated = new Date(cached.timestamp);
+      syncAedFromPeg();
     }else{
       ratesFromCache = false;
     }
@@ -953,6 +968,7 @@ const TRANSLATIONS = {
   appErrorMessage: {tr:'Bir şeyler ters gitti.', en:'Something went wrong.', de:'Etwas ist schiefgelaufen.', ja:'問題が発生しました。', zh:'出了点问题。'},
   restartBtn: {tr:'Yeniden Başlat', en:'Restart', de:'Neu starten', ja:'再起動', zh:'重新启动'},
   selectTwoCurrencies: {tr:'Lütfen farklı iki para birimi seç.', en:'Please select two different currencies.', de:'Bitte waehle zwei unterschiedliche Waehrungen.', ja:'2つの異なる通貨を選択してください。', zh:'请选择两种不同的货币。'},
+  aedFixedRateNote: {tr:'ℹ️ BAE Dirhemi (AED), Frankfurter kur servisi tarafından desteklenmiyor. Bunun yerine AED, ABD Doları\'na resmi sabit kuruyla (1 USD = 3.6725 AED, BAE Merkez Bankası pariteği) hesaplanıyor — canlı piyasa kuru değildir.', en:'ℹ️ UAE Dirham (AED) is not supported by the Frankfurter rate service. Instead, AED is calculated using its official fixed peg to the US Dollar (1 USD = 3.6725 AED, UAE Central Bank parity) — not a live market rate.', de:'ℹ️ Der VAE-Dirham (AED) wird vom Frankfurter-Kursdienst nicht unterstuetzt. Stattdessen wird AED ueber die offizielle feste Bindung an den US-Dollar berechnet (1 USD = 3,6725 AED, Paritaet der Zentralbank der VAE) — kein Live-Marktkurs.', ja:'ℹ️ UAEディルハム(AED)はFrankfurterレートサービスでサポートされていません。代わりに、AEDは米ドルへの公式固定ペッグ(1 USD = 3.6725 AED、UAE中央銀行平価)を使用して計算されます — ライブ市場レートではありません。', zh:'ℹ️ 阿联酋迪拉姆(AED)不受Frankfurter汇率服务支持。AED改为使用其与美元的官方固定汇率计算(1美元=3.6725迪拉姆,阿联酋中央银行平价)——并非实时市场汇率。'},
   calculatedWithApp: {tr:'Fiyatla ile hesaplandı', en:'calculated with Fiyatla', de:'berechnet mit Fiyatla', ja:'Fiyatlaで計算', zh:'由Fiyatla计算'},
   countryGermany: {tr:'Almanya', en:'Germany', de:'Deutschland', ja:'ドイツ', zh:'德国'},
   countryFrance: {tr:'Fransa', en:'France', de:'Frankreich', ja:'フランス', zh:'法国'},
@@ -1359,6 +1375,7 @@ function renderConvert(){
           </select>
         </div>
       </div>
+      ${(state.fromCcy === 'AED' || state.toCcy === 'AED') ? `<div class="note">${t('aedFixedRateNote')}</div>` : ''}
       <button class="primary" onclick="doConvert()">${t('convertBtn')}</button>
       <div id="convert-result" aria-live="polite" aria-atomic="true"></div>
     </main>
