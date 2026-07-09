@@ -735,7 +735,9 @@ function loadRatesFromCache(){
   try{
     const raw = localStorage.getItem(RATES_CACHE_KEY);
     if(!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if(!parsed || typeof parsed.rates !== 'object' || parsed.rates === null) return null;
+    return parsed;
   }catch(e){
     return null;
   }
@@ -1034,11 +1036,6 @@ function setLanguage(lang){
   state.lang = lang;
   try{ localStorage.setItem('fiyatla_lang', lang); }catch(e){}
   document.documentElement.lang = lang;
-  const defaultCcy = LANG_TO_CCY[lang];
-  if(defaultCcy){
-    state.fromCcy = defaultCcy;
-    state.toCcy = defaultCcy === 'EUR' ? 'USD' : 'EUR';
-  }
   render();
 }
 
@@ -1062,7 +1059,9 @@ try{ savedLang = localStorage.getItem('fiyatla_lang') || 'tr'; }catch(e){}
 let savedThemeOverride = null;
 try{ savedThemeOverride = localStorage.getItem('fiyatla_theme_override') || null; }catch(e){}
 
-let state = { screen: 'home', stream: null, fromCcy: 'TRY', toCcy: 'EUR', lang: savedLang, themeOverride: savedThemeOverride };
+const initialFromCcy = LANG_TO_CCY[savedLang] || 'TRY';
+const initialToCcy = initialFromCcy === 'EUR' ? 'USD' : 'EUR';
+let state = { screen: 'home', stream: null, fromCcy: initialFromCcy, toCcy: initialToCcy, lang: savedLang, themeOverride: savedThemeOverride };
 
 function systemPrefersDark(){
   try{
@@ -1382,7 +1381,11 @@ function renderScan(){
         <div class="history-block">
           <label>${t('recentSearches')}</label>
           <div class="history-chips">
-            ${history.map(h => `<button class="chip" onclick="rerunHistory('${h.mode}','${h.value.replace(/'/g,"\\'")}')">${h.value}</button>`).join('')}
+            ${history.map(h => {
+              const safeValue = escapeHtml(h.value);
+              const jsValue = safeValue.replace(/'/g, "\\'");
+              return `<button class="chip" onclick="rerunHistory('${h.mode}','${jsValue}')">${safeValue}</button>`;
+            }).join('')}
           </div>
         </div>
       ` : ''}
@@ -1425,6 +1428,7 @@ function attachHandlers(){
 }
 
 function setSearchMode(mode){
+  if(state.searchMode !== mode) stopCamera();
   state.searchMode = mode;
   render();
 }
@@ -1745,6 +1749,8 @@ function editTrackedItem(id){
   const items = getTrackedItems();
   const item = items.find(i => i.id === id);
   if(!item) return;
+  const numericTarget = Number(item.targetPrice);
+  const targetValue = Number.isFinite(numericTarget) ? numericTarget.toFixed(2) : '0.00';
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'track-modal-overlay';
@@ -1753,7 +1759,7 @@ function editTrackedItem(id){
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
       <h3 class="modal-title" id="modal-a11y-title">${item.name}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
-      <input type="number" id="target-price-input" value="${item.targetPrice.toFixed(2)}" step="0.01" inputmode="decimal" />
+      <input type="number" id="target-price-input" value="${targetValue}" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
         <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
         <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${id}')">${t('trackConfirm')}</button>
@@ -1781,11 +1787,12 @@ async function confirmEditTrackedItem(id){
     try{
       await window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: [{ id: item.notifId }] });
     }catch(e){}
+    item.notifId = null;
   }
 
   const granted = await requestNotificationPermission();
   if(granted && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
-    const newNotifId = Math.floor(Date.now() % 100000);
+    const newNotifId = nextNotifId();
     try{
       await window.Capacitor.Plugins.LocalNotifications.schedule({
         notifications: [{
@@ -1982,6 +1989,7 @@ async function tryUpcItemDb(code){
       product_name: item.title || item.model || 'Bilinmeyen urun',
       brands: item.brand || '-',
       image_front_small_url: (item.images && item.images[0]) || '',
+      _source: 'upcitemdb',
     };
     renderProductResult(normalized, code);
     return true;
@@ -2223,10 +2231,20 @@ const TRACKING_KEY = 'fiyatla_tracked_items';
 
 function getTrackedItems(){
   try{
-    return JSON.parse(localStorage.getItem(TRACKING_KEY) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(TRACKING_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
   }catch(e){
     return [];
   }
+}
+
+function nextNotifId(){
+  const used = new Set(getTrackedItems().map(i => i.notifId).filter(id => id));
+  let id;
+  do{
+    id = Math.floor(Math.random() * 100000);
+  }while(used.has(id));
+  return id;
 }
 
 function saveTrackedItems(items){
@@ -2256,26 +2274,30 @@ async function requestNotificationPermission(){
 async function trackProduct(name, brand, code, targetPrice){
   const items = getTrackedItems();
   const id = `${code}_${Date.now()}`;
-  const notifId = Math.floor(Date.now() % 100000);
-  items.push({ id, name, brand, code, targetPrice, notifId });
-  saveTrackedItems(items);
+  let notifId = null;
 
   const granted = await requestNotificationPermission();
-  if(!granted){
-    return;
+  if(granted){
+    notifId = nextNotifId();
+    try{
+      await window.Capacitor.Plugins.LocalNotifications.schedule({
+        notifications: [{
+          id: notifId,
+          title: t('notifTitle'),
+          body: td('notifBody', name, formatNumber(targetPrice, 2)),
+          schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
+        }]
+      });
+    }catch(e){
+      notifId = null;
+      showToast(td('trackScheduleError', e.message));
+    }
   }
-  try{
-    await window.Capacitor.Plugins.LocalNotifications.schedule({
-      notifications: [{
-        id: notifId,
-        title: t('notifTitle'),
-        body: td('notifBody', name, formatNumber(targetPrice, 2)),
-        schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
-      }]
-    });
+
+  items.push({ id, name, brand, code, targetPrice, notifId });
+  saveTrackedItems(items);
+  if(notifId){
     showToast(td('trackSuccess', name));
-  }catch(e){
-    showToast(td('trackScheduleError', e.message));
   }
 }
 
@@ -2321,7 +2343,7 @@ function initModalA11y(overlay){
   if(focusables.length) focusables[0].focus();
   function trap(e){
     if(e.key === 'Escape'){
-      overlay.querySelector('.modal-btn-secondary, .chip')?.click();
+      overlay.querySelector('.modal-btn-secondary, .chip, .modal-btn-primary')?.click();
     }else if(e.key === 'Tab' && focusables.length){
       const first = focusables[0];
       const last = focusables[focusables.length-1];
