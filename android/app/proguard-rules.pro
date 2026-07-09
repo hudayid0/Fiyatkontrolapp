@@ -81,3 +81,13 @@
 # ============================================================
 -keep class io.capawesome.capacitorjs.plugins.firebase.analytics.** { *; }
 -keep class com.google.firebase.analytics.** { *; }
+
+# ============================================================
+# @capacitor/background-runner
+# TimedNotificationPublisher is looked up by fully qualified class
+# name from AndroidManifest.xml (BroadcastReceiver, same reflection
+# risk as @capacitor/local-notifications' own publisher). The plugin
+# also bundles its own embedded JS engine (android-js-engine-release.aar)
+# for running the background runner script - keep it wholesale.
+# ============================================================
+-keep class io.ionic.backgroundrunner.** { *; }

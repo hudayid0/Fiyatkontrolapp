@@ -771,6 +771,7 @@ async function fetchLiveRates(){
     }
     console.log('Canli kur alinamadi:', e.message);
   }
+  syncBackgroundRunnerData();
   render();
 }
 
@@ -2222,6 +2223,17 @@ function nextNotifId(items){
 
 function saveTrackedItems(items){
   localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+  syncBackgroundRunnerData(items);
+}
+
+function syncBackgroundRunnerData(items){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.BackgroundRunner) return;
+  const minimalItems = (items || getTrackedItems()).map(i => ({ id: i.id, code: i.code, name: i.name, targetPrice: i.targetPrice }));
+  window.Capacitor.Plugins.BackgroundRunner.dispatchEvent({
+    label: 'com.hudayi.fiyatkontrol.pricecheck',
+    event: 'syncData',
+    details: { items: minimalItems, rates: RATES_TO_EUR },
+  }).catch(()=>{});
 }
 
 const SEARCH_HISTORY_KEY = 'fiyatla_search_history';
