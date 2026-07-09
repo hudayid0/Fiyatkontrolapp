@@ -1737,12 +1737,8 @@ function editTrackedItem(id){
 }
 
 async function confirmEditTrackedItem(id){
-  const input = document.getElementById('target-price-input');
-  const target = parseFloat(input.value.replace(',', '.'));
-  if(isNaN(target) || target <= 0){
-    input.style.borderColor = 'var(--danger)';
-    return;
-  }
+  const target = parseTargetPriceInput();
+  if(target === null) return;
   closeTrackModal();
   const items = getTrackedItems();
   const item = items.find(i => i.id === id);
@@ -1756,21 +1752,7 @@ async function confirmEditTrackedItem(id){
     item.notifId = null;
   }
 
-  const granted = await requestNotificationPermission();
-  if(granted && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
-    const newNotifId = nextNotifId();
-    try{
-      await window.Capacitor.Plugins.LocalNotifications.schedule({
-        notifications: [{
-          id: newNotifId,
-          title: t('notifTitle'),
-          body: td('notifBody', item.name, formatNumber(target, 2)),
-          schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
-        }]
-      });
-      item.notifId = newNotifId;
-    }catch(e){}
-  }
+  item.notifId = await scheduleTrackingNotification(item.name, target);
   saveTrackedItems(items);
   render();
 }
@@ -2247,28 +2229,42 @@ async function requestNotificationPermission(){
   }
 }
 
+function parseTargetPriceInput(){
+  const input = document.getElementById('target-price-input');
+  const target = parseFloat(input.value.replace(',', '.'));
+  if(isNaN(target) || target <= 0){
+    input.style.borderColor = 'var(--danger)';
+    return null;
+  }
+  return target;
+}
+
+async function scheduleTrackingNotification(name, targetPrice, { onError } = {}){
+  const granted = await requestNotificationPermission();
+  if(!granted) return null;
+  const notifId = nextNotifId();
+  try{
+    await window.Capacitor.Plugins.LocalNotifications.schedule({
+      notifications: [{
+        id: notifId,
+        title: t('notifTitle'),
+        body: td('notifBody', name, formatNumber(targetPrice, 2)),
+        schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
+      }]
+    });
+    return notifId;
+  }catch(e){
+    if(onError) onError(e);
+    return null;
+  }
+}
+
 async function trackProduct(name, brand, code, targetPrice){
   const items = getTrackedItems();
   const id = `${code}_${Date.now()}`;
-  let notifId = null;
-
-  const granted = await requestNotificationPermission();
-  if(granted){
-    notifId = nextNotifId();
-    try{
-      await window.Capacitor.Plugins.LocalNotifications.schedule({
-        notifications: [{
-          id: notifId,
-          title: t('notifTitle'),
-          body: td('notifBody', name, formatNumber(targetPrice, 2)),
-          schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
-        }]
-      });
-    }catch(e){
-      notifId = null;
-      showToast(td('trackScheduleError', e.message));
-    }
-  }
+  const notifId = await scheduleTrackingNotification(name, targetPrice, {
+    onError: (e) => showToast(td('trackScheduleError', e.message))
+  });
 
   items.push({ id, name, brand, code, targetPrice, notifId });
   saveTrackedItems(items);
@@ -2307,6 +2303,7 @@ function promptTrackProduct(name, brand, code){
 }
 
 function openModal(id, innerHtml){
+  closeModal(id);
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = id;
@@ -2358,12 +2355,8 @@ function closeTrackModal(){
 }
 
 function confirmTrackProduct(name, brand, code){
-  const input = document.getElementById('target-price-input');
-  const target = parseFloat(input.value.replace(',', '.'));
-  if(isNaN(target) || target <= 0){
-    input.style.borderColor = 'var(--danger)';
-    return;
-  }
+  const target = parseTargetPriceInput();
+  if(target === null) return;
   closeTrackModal();
   trackProduct(name, brand, code, target);
 }
