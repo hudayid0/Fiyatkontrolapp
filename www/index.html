@@ -621,26 +621,6 @@
     justify-content:center;
     cursor:pointer;
   }
-  .ad-close-wrap{
-    width:100%;
-    display:flex;
-    justify-content:flex-end;
-    padding:4px 10px;
-    background:var(--surface);
-    border-bottom:1px solid var(--line);
-  }
-  .ad-close-btn{
-    background:transparent;
-    border:none;
-    color:var(--text-dim);
-    font-size:12px;
-    line-height:1;
-    cursor:pointer;
-    padding:4px 8px;
-    display:flex;
-    align-items:center;
-    gap:4px;
-  }
   @keyframes screenFadeIn{
     from{ opacity:0; transform:translateY(10px); }
     to{ opacity:1; transform:translateY(0); }
@@ -966,9 +946,6 @@ const TRANSLATIONS = {
   clearDataConfirmBtn: {de:'Ja, loeschen', tr:'Evet, Sil', en:'Yes, Delete', ja:'はい、削除します', zh:'是的,删除'},
   offlineMessage: {de:'Keine Internetverbindung. Manche Funktionen funktionieren moeglicherweise nicht.', tr:'📡 İnternet bağlantın yok. Bazı özellikler çalışmayabilir.', en:'📡 No internet connection. Some features may not work.', ja:'📡 インターネット接続がありません。一部の機能が動作しない場合があります。', zh:'📡 没有网络连接。某些功能可能无法使用。'},
   invalidAmountRange: {de:'Bitte gib einen gueltigen (positiven, angemessenen) Betrag ein.', tr:'Lütfen geçerli (pozitif ve makul büyüklükte) bir tutar gir.', en:'Please enter a valid (positive, reasonable) amount.', ja:'有効な(正の、妥当な範囲の)金額を入力してください。', zh:'请输入有效的(正数且合理范围内的)金额。'},
-  hapticLabel: {de:'Haptisches Feedback', tr:'Dokunma Geri Bildirimi', en:'Haptic Feedback', ja:'触覚フィードバック', zh:'触觉反馈'},
-  stateOn: {de:'An', tr:'Açık', en:'On', ja:'オン', zh:'开'},
-  stateOff: {de:'Aus', tr:'Kapalı', en:'Off', ja:'オフ', zh:'关'},
   egLabel: {tr:'Örn.', en:'E.g.', de:'Z.B.', ja:'例:', zh:'例如:'},
   trackingDisclaimer: {tr:'Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.', en:'Note: Since price data is currently simulated, real-time "price drop" detection is not possible. This reminder sends a "check again" message at regular intervals via your phone\'s notification system.', de:'Hinweis: Da die Preisdaten derzeit simuliert werden, ist eine Echtzeit-Erkennung von Preissenkungen nicht moeglich. Diese Erinnerung sendet in regelmaessigen Abstaenden eine "erneut pruefen"-Nachricht ueber das Benachrichtigungssystem deines Telefons.', ja:'注: 現在価格データはシミュレートされているため、リアルタイムの「値下げ」検出はできません。このリマインダーは、お使いの携帯電話の通知システムを通じて定期的に「再確認」メッセージを送信します。', zh:'注意:由于价格数据目前是模拟的,无法进行实时"降价"检测。此提醒将通过您手机的通知系统定期发送"重新检查"消息。'},
   appErrorMessage: {tr:'Bir şeyler ters gitti.', en:'Something went wrong.', de:'Etwas ist schiefgelaufen.', ja:'問題が発生しました。', zh:'出了点问题。'},
@@ -1154,23 +1131,6 @@ if(window.matchMedia){
       if(state.themeOverride === null) render();
     });
   }catch(e){}
-}
-
-function renderAdCloseButton(){
-  let el = document.getElementById('ad-close-wrap');
-  if(!adsEnabled){
-    if(el) el.remove();
-    return;
-  }
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'ad-close-wrap';
-    el.className = 'ad-close-wrap';
-    document.body.insertBefore(el, document.body.firstChild);
-  }
-  const closeLabels = {de:'Werbung schliessen', tr:'Reklamı kapat', en:'Close ad', ja:'広告を閉じる', zh:'关闭广告'};
-  const label = closeLabels[state.lang] || closeLabels.tr;
-  el.innerHTML = `<button class="ad-close-btn" onclick="toggleAds()">${label} ✕</button>`;
 }
 
 let animateNextRender = false;
@@ -2599,13 +2559,6 @@ async function initAdMob(){
 let adsEnabled = true;
 try{ adsEnabled = localStorage.getItem('fiyatla_ads_enabled') !== 'false'; }catch(e){}
 
-function toggleAds(){
-  adsEnabled = !adsEnabled;
-  try{ localStorage.setItem('fiyatla_ads_enabled', adsEnabled ? 'true' : 'false'); }catch(e){}
-  if(adsEnabled) showBannerAd(); else hideBannerAd();
-  render();
-}
-
 function setupAdSizeListener(){
   window.adDebugInfo = 'listener kurulmadi (AdMob yok)';
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
@@ -2637,13 +2590,6 @@ async function showBannerAd(){
   }catch(e){
     console.log('Banner gosterilemedi:', e.message);
   }
-}
-
-async function hideBannerAd(){
-  if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
-  try{
-    await window.Capacitor.Plugins.AdMob.hideBanner();
-  }catch(e){}
 }
 
 async function handleGalleryImage(event){
