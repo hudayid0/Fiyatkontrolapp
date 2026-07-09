@@ -930,6 +930,7 @@ const TRANSLATIONS = {
   stateOn: {de:'An', tr:'Açık', en:'On', ja:'オン', zh:'开'},
   stateOff: {de:'Aus', tr:'Kapalı', en:'Off', ja:'オフ', zh:'关'},
   egLabel: {tr:'Örn.', en:'E.g.', de:'Z.B.', ja:'例:', zh:'例如:'},
+  trackingDisclaimer: {tr:'Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.', en:'Note: Since price data is currently simulated, real-time "price drop" detection is not possible. This reminder sends a "check again" message at regular intervals via your phone\'s notification system.', de:'Hinweis: Da die Preisdaten derzeit simuliert werden, ist eine Echtzeit-Erkennung von Preissenkungen nicht moeglich. Diese Erinnerung sendet in regelmaessigen Abstaenden eine "erneut pruefen"-Nachricht ueber das Benachrichtigungssystem deines Telefons.', ja:'注: 現在価格データはシミュレートされているため、リアルタイムの「値下げ」検出はできません。このリマインダーは、お使いの携帯電話の通知システムを通じて定期的に「再確認」メッセージを送信します。', zh:'注意:由于价格数据目前是模拟的,无法进行实时"降价"检测。此提醒将通过您手机的通知系统定期发送"重新检查"消息。'},
 };
 
 const TRANSLATIONS_FN = {
@@ -2180,9 +2181,7 @@ function renderTracking(){
           <button class="go-btn" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
         </div>
       `).join('')}
-      <div class="note">
-        Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.
-      </div>
+      <div class="note">${t('trackingDisclaimer')}</div>
     </main>
     <footer>${t('footerTracking')}</footer>
   `;
