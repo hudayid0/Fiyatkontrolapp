@@ -1036,6 +1036,7 @@ function setLanguage(lang){
   state.lang = lang;
   try{ localStorage.setItem('fiyatla_lang', lang); }catch(e){}
   document.documentElement.lang = lang;
+  logAnalyticsEvent('language_changed', { language: lang });
   const defaultCcy = LANG_TO_CCY[lang];
   if(defaultCcy){
     state.fromCcy = defaultCcy;
@@ -1461,6 +1462,7 @@ function goTo(screen){
   stopCamera();
   state.screen = screen;
   animateNextRender = true;
+  logScreenView(screen);
   render();
 }
 
@@ -1495,6 +1497,7 @@ function doConvert(){
   }
   const converted = convertAmount(amount, from, to);
   const rate = crossRate(from, to);
+  logAnalyticsEvent('currency_converted', { from_currency: from, to_currency: to, amount });
   const shareMsg = `${amount} ${from} = ${formatNumber(converted, 2)} ${to} (${t('calculatedWithApp')})`;
   resultBox.innerHTML = `
     <div class="result">
@@ -2088,6 +2091,7 @@ function selectSearchResult(index){
 
 function renderProductResult(p, code){
   setCachedProduct(code, p);
+  logAnalyticsEvent('product_scan_success', { method: state.searchMode === 'name' ? 'name' : 'barcode', barcode: code });
   const box = document.getElementById('scan-result');
   const name = escapeHtml(p.product_name || p.generic_name || 'Bilinmeyen ürün');
   const brand = escapeHtml(p.brands || '—');
@@ -2301,6 +2305,7 @@ async function trackProduct(name, brand, code, targetPrice){
 
   items.push({ id, name, brand, code, targetPrice, notifId });
   saveTrackedItems(items);
+  logAnalyticsEvent('product_tracked', { barcode: code, target_price: targetPrice });
   if(notifId){
     showToast(td('trackSuccess', name));
   }
@@ -2447,6 +2452,23 @@ async function handleConsent(){
   }
 }
 
+async function initAnalytics(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  try{
+    await window.Capacitor.Plugins.FirebaseAnalytics.setEnabled({ enabled: true });
+  }catch(e){}
+}
+
+function logAnalyticsEvent(name, params){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  window.Capacitor.Plugins.FirebaseAnalytics.logEvent({ name, params }).catch(()=>{});
+}
+
+function logScreenView(screenName){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  window.Capacitor.Plugins.FirebaseAnalytics.setCurrentScreen({ screenName }).catch(()=>{});
+}
+
 async function initAdMob(){
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob){
     maybeShowOnboarding(window.fiyatlaOpenCount);
@@ -2586,6 +2608,7 @@ window.addEventListener('unhandledrejection', (event) => {
 window.__pendingRatePromptCount = null;
 window.fiyatlaOpenCount = getAppOpenCount();
 cleanupExpiredCache();
+initAnalytics();
 initAdMob();
 fetchLiveRates();
 setupBackButton();

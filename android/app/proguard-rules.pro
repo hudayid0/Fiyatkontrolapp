@@ -75,3 +75,9 @@
 -keepattributes SourceFile,LineNumberTable
 -keepattributes *Annotation*
 -keep public class * extends java.lang.Exception
+
+# ============================================================
+# @capacitor-firebase/analytics + underlying Firebase Analytics SDK
+# ============================================================
+-keep class io.capawesome.capacitorjs.plugins.firebase.analytics.** { *; }
+-keep class com.google.firebase.analytics.** { *; }
