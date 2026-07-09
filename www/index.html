@@ -1173,7 +1173,13 @@ function render(){
   }
 }
 
+let tickerCache = { html: null, lang: null, ratesKey: null };
+
 function renderTicker(){
+  const ratesKey = JSON.stringify(RATES_TO_EUR);
+  if(tickerCache.html !== null && tickerCache.lang === state.lang && tickerCache.ratesKey === ratesKey){
+    return tickerCache.html;
+  }
   const eurItems = Object.entries(RATES_TO_EUR)
     .filter(([code]) => code !== 'TRY')
     .map(([code, rate]) => `<span>1 ${code} = <b>€${formatNumber(rate, 4)}</b></span>`);
@@ -1184,7 +1190,9 @@ function renderTicker(){
       return `<span>1 ${code} = <b>₺${formatNumber(inTry, 2)}</b></span>`;
     });
   const html = [...eurItems, ...tryItems].join('');
-  return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
+  const result = `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
+  tickerCache = { html: result, lang: state.lang, ratesKey };
+  return result;
 }
 
 function sendFeedback(){
@@ -1752,7 +1760,7 @@ async function confirmEditTrackedItem(id){
     item.notifId = null;
   }
 
-  item.notifId = await scheduleTrackingNotification(item.name, target);
+  item.notifId = await scheduleTrackingNotification(item.name, target, { existingItems: items });
   saveTrackedItems(items);
   render();
 }
@@ -2181,8 +2189,8 @@ function getTrackedItems(){
   }
 }
 
-function nextNotifId(){
-  const used = new Set(getTrackedItems().map(i => i.notifId).filter(id => id));
+function nextNotifId(items){
+  const used = new Set((items || getTrackedItems()).map(i => i.notifId).filter(id => id));
   let id;
   do{
     id = Math.floor(Math.random() * 100000);
@@ -2239,10 +2247,10 @@ function parseTargetPriceInput(){
   return target;
 }
 
-async function scheduleTrackingNotification(name, targetPrice, { onError } = {}){
+async function scheduleTrackingNotification(name, targetPrice, { onError, existingItems } = {}){
   const granted = await requestNotificationPermission();
   if(!granted) return null;
-  const notifId = nextNotifId();
+  const notifId = nextNotifId(existingItems);
   try{
     await window.Capacitor.Plugins.LocalNotifications.schedule({
       notifications: [{
@@ -2263,6 +2271,7 @@ async function trackProduct(name, brand, code, targetPrice){
   const items = getTrackedItems();
   const id = `${code}_${Date.now()}`;
   const notifId = await scheduleTrackingNotification(name, targetPrice, {
+    existingItems: items,
     onError: (e) => showToast(td('trackScheduleError', e.message))
   });
 
@@ -2576,7 +2585,7 @@ window.addEventListener('unhandledrejection', (event) => {
 
 window.__pendingRatePromptCount = null;
 window.fiyatlaOpenCount = getAppOpenCount();
-cleanupExpiredCache();
+setTimeout(cleanupExpiredCache, 0);
 initAnalytics();
 logScreenView(state.screen);
 initAdMob();
