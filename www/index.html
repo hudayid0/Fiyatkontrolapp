@@ -931,6 +931,9 @@ const TRANSLATIONS = {
   shareBtn: {de:'Teilen', tr:'Paylaş', en:'Share', ja:'共有', zh:'分享'},
   termsLink: {de:'Nutzungsbedingungen ansehen', tr:'Kullanım Şartlarını Görüntüle', en:'View Terms of Service', ja:'利用規約を見る', zh:'查看服务条款'},
   feedbackBtn: {de:'Feedback senden', tr:'💬 Öneri / Hata Bildir', en:'💬 Send Feedback', ja:'💬 フィードバックを送る', zh:'💬 发送反馈'},
+  reportProblemBtn: {de:'Problem melden', tr:'🐞 Sorun Bildir', en:'🐞 Report a Problem', ja:'🐞 問題を報告', zh:'🐞 报告问题'},
+  reportProblemSuccess: {de:'Danke, das Problem wurde gemeldet.', tr:'Teşekkürler, sorun bildirildi.', en:'Thanks, the problem has been reported.', ja:'ご報告ありがとうございます。問題が報告されました。', zh:'谢谢,问题已报告。'},
+  reportProblemError: {de:'Problem konnte nicht gemeldet werden.', tr:'Sorun bildirilemedi.', en:'Could not report the problem.', ja:'問題を報告できませんでした。', zh:'无法报告问题。'},
   clearDataBtn: {de:'Alle Daten loeschen', tr:'🗑️ Tüm Verileri Temizle', en:'🗑️ Clear All Data', ja:'🗑️ すべてのデータを削除', zh:'🗑️ 清除所有数据'},
   clearDataTitle: {de:'Bist du sicher?', tr:'Emin misin?', en:'Are you sure?', ja:'よろしいですか?', zh:'您确定吗?'},
   clearDataWarning: {de:'Deine Watchliste, dein Suchverlauf und alle Einstellungen werden dauerhaft geloescht. Dies kann nicht rueckgaengig gemacht werden.', tr:'Takip listen, arama geçmişin ve tüm tercihlerin kalıcı olarak silinecek. Bu işlem geri alınamaz.', en:'Your watchlist, search history, and all preferences will be permanently deleted. This cannot be undone.', ja:'ウォッチリスト、検索履歴、すべての設定が完全に削除されます。この操作は元に戻せません。', zh:'您的关注列表、搜索历史和所有偏好设置将被永久删除。此操作无法撤销。'},
@@ -1201,6 +1204,22 @@ function sendFeedback(){
   window.open('mailto:support.fiyatla@gmail.com?subject=' + subject + '&body=' + body, '_system');
 }
 
+async function reportProblem(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseCrashlytics){
+    showToast(t('reportProblemError'));
+    return;
+  }
+  try{
+    await window.Capacitor.Plugins.FirebaseCrashlytics.recordException({
+      message: `Kullanici sorun bildirdi - ekran: ${state.screen}, dil: ${state.lang}, surum: ${APP_VERSION}`,
+    });
+    await window.Capacitor.Plugins.FirebaseCrashlytics.sendUnsentReports();
+    showToast(t('reportProblemSuccess'));
+  }catch(e){
+    showToast(t('reportProblemError'));
+  }
+}
+
 function confirmClearAllData(){
   openModal('clear-data-modal-overlay', `
     <div class="modal-card">
@@ -1255,6 +1274,9 @@ function renderSettings(){
       ` : ''}
       <div class="card" style="margin-top:12px;">
         <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="reportProblem()">${t('reportProblemBtn')}</button>
       </div>
       <div class="card card-static" style="margin-top:12px;">
         <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
