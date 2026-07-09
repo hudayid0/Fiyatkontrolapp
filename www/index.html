@@ -230,6 +230,33 @@
     color:var(--text-dim);
     margin-top:4px;
   }
+  .sparkline-wrap{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+  .sparkline-label{
+    font-size:11px;
+    color:var(--text-dim);
+    flex:0 0 auto;
+  }
+  .sparkline{
+    width:100%;
+    max-width:120px;
+    height:28px;
+    flex:1 1 auto;
+  }
+  .sparkline-delta{
+    font-size:11px;
+    font-weight:600;
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  .sparkline-delta-up{color:var(--teal);}
+  .sparkline-delta-down{color:var(--danger);}
 
   /* Scan screen */
   .scan-box{
@@ -879,6 +906,87 @@ function crossRate(fromCode, toCode){
   return RATES_TO_EUR[fromCode] / RATES_TO_EUR[toCode];
 }
 
+function sparklineCacheKey(fromCcy, toCcy){
+  return `fiyatla_sparkline_${fromCcy}_${toCcy}`;
+}
+
+async function fetchSparklineHistory(fromCcy, toCcy){
+  if(!fromCcy || !toCcy || fromCcy === toCcy) return null;
+  // Frankfurter kur servisi AED'yi desteklemiyor (RATES_TO_EUR icin de sabit
+  // parite kullaniliyor), bu yuzden gecmis veri de cekilemez.
+  if(fromCcy === 'AED' || toCcy === 'AED') return null;
+
+  const cacheKey = sparklineCacheKey(fromCcy, toCcy);
+  try{
+    const raw = localStorage.getItem(cacheKey);
+    if(raw){
+      const cached = JSON.parse(raw);
+      const sameDay = cached && cached.timestamp && new Date(cached.timestamp).toDateString() === new Date().toDateString();
+      if(sameDay && Array.isArray(cached.values) && cached.values.length >= 2){
+        return cached.values;
+      }
+    }
+  }catch(e){}
+
+  try{
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 7);
+    const fmt = d => d.toISOString().slice(0,10);
+    const res = await fetch(`https://api.frankfurter.dev/v1/${fmt(start)}..${fmt(end)}?from=${fromCcy}&to=${toCcy}`);
+    if(!res.ok) throw new Error('API hatasi');
+    const data = await res.json();
+    const dateKeys = Object.keys(data.rates || {}).sort();
+    const values = dateKeys.map(d => data.rates[d][toCcy]).filter(v => typeof v === 'number' && v > 0);
+    if(values.length < 2) return null;
+    try{
+      localStorage.setItem(cacheKey, JSON.stringify({ values, timestamp: new Date().toISOString() }));
+    }catch(e){}
+    return values;
+  }catch(e){
+    console.log('Kur gecmisi (sparkline) alinamadi:', e.message);
+    return null;
+  }
+}
+
+function buildSparklineHtml(values, fromCcy, toCcy){
+  if(!Array.isArray(values) || values.length < 2) return '';
+  const w = 100, h = 28, padX = 3, padY = 3;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = (max - min) || (Math.abs(min) * 0.0001) || 1;
+  const stepX = (w - padX * 2) / (values.length - 1);
+  const points = values.map((v, i) => ({
+    x: padX + i * stepX,
+    y: padY + (h - padY * 2) * (1 - (v - min) / range),
+    v,
+  }));
+  const path = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(2) + ',' + p.y.toFixed(2)).join(' ');
+  const trendUp = values[values.length - 1] >= values[0];
+  const pctChange = values[0] !== 0 ? Math.abs((values[values.length - 1] - values[0]) / values[0] * 100) : 0;
+  const pctLabel = pctChange.toFixed(1);
+  const ariaLabel = td('sparklineAria', fromCcy, toCcy, pctLabel, trendUp);
+  const dots = points.map(p => `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.6" fill="var(--teal)"><title>1 ${fromCcy} = ${p.v.toFixed(4)} ${toCcy}</title></circle>`).join('');
+  return `
+    <div class="sparkline-wrap">
+      <span class="sparkline-label">${t('sparklineLabel')}</span>
+      <svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
+        <path d="${path}" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${dots}
+      </svg>
+      <span class="sparkline-delta ${trendUp ? 'sparkline-delta-up' : 'sparkline-delta-down'}">${trendUp ? '▲' : '▼'} ${pctLabel}%</span>
+    </div>
+  `;
+}
+
+async function renderSparklineArea(fromCcy, toCcy){
+  const values = await fetchSparklineHistory(fromCcy, toCcy);
+  if(!values) return;
+  const area = document.getElementById('sparkline-area');
+  if(!area) return;
+  area.innerHTML = buildSparklineHtml(values, fromCcy, toCcy);
+}
+
 const LANG_TO_CCY = { tr:'TRY', en:'USD', ja:'JPY', zh:'CNY', de:'EUR' };
 
 const TRANSLATIONS = {
@@ -1021,6 +1129,7 @@ const TRANSLATIONS = {
   selectTwoCurrencies: {tr:'Lütfen farklı iki para birimi seç.', en:'Please select two different currencies.', de:'Bitte waehle zwei unterschiedliche Waehrungen.', ja:'2つの異なる通貨を選択してください。', zh:'请选择两种不同的货币。'},
   aedFixedRateNote: {tr:'ℹ️ BAE Dirhemi (AED), Frankfurter kur servisi tarafından desteklenmiyor. Bunun yerine AED, ABD Doları\'na resmi sabit kuruyla (1 USD = 3.6725 AED, BAE Merkez Bankası pariteği) hesaplanıyor — canlı piyasa kuru değildir.', en:'ℹ️ UAE Dirham (AED) is not supported by the Frankfurter rate service. Instead, AED is calculated using its official fixed peg to the US Dollar (1 USD = 3.6725 AED, UAE Central Bank parity) — not a live market rate.', de:'ℹ️ Der VAE-Dirham (AED) wird vom Frankfurter-Kursdienst nicht unterstuetzt. Stattdessen wird AED ueber die offizielle feste Bindung an den US-Dollar berechnet (1 USD = 3,6725 AED, Paritaet der Zentralbank der VAE) — kein Live-Marktkurs.', ja:'ℹ️ UAEディルハム(AED)はFrankfurterレートサービスでサポートされていません。代わりに、AEDは米ドルへの公式固定ペッグ(1 USD = 3.6725 AED、UAE中央銀行平価)を使用して計算されます — ライブ市場レートではありません。', zh:'ℹ️ 阿联酋迪拉姆(AED)不受Frankfurter汇率服务支持。AED改为使用其与美元的官方固定汇率计算(1美元=3.6725迪拉姆,阿联酋中央银行平价)——并非实时市场汇率。'},
   calculatedWithApp: {tr:'Fiyatla ile hesaplandı', en:'calculated with Fiyatla', de:'berechnet mit Fiyatla', ja:'Fiyatlaで計算', zh:'由Fiyatla计算'},
+  sparklineLabel: {tr:'Son 7 gün', en:'Last 7 days', de:'Letzte 7 Tage', ja:'過去7日間', zh:'最近7天'},
   countryGermany: {tr:'Almanya', en:'Germany', de:'Deutschland', ja:'ドイツ', zh:'德国'},
   countryFrance: {tr:'Fransa', en:'France', de:'Frankreich', ja:'フランス', zh:'法国'},
   countryUK: {tr:'İngiltere', en:'UK', de:'Grossbritannien', ja:'イギリス', zh:'英国'},
@@ -1100,6 +1209,13 @@ const TRANSLATIONS_FN = {
     de: `❓ Keine echten Preisdaten fuer ${name} gefunden`,
     ja: `❓ ${name}の実際の価格データが見つかりません`,
     zh: `❓ 未找到${name}的真实价格数据`,
+  }),
+  sparklineAria: (from, to, pct, up) => ({
+    tr: `${from} / ${to} son 7 gün trendi: ${up ? 'yükseldi' : 'düştü'} %${pct}`,
+    en: `${from} / ${to} 7-day trend: ${up ? 'up' : 'down'} ${pct}%`,
+    de: `${from} / ${to} 7-Tage-Trend: ${up ? 'gestiegen' : 'gesunken'} um ${pct}%`,
+    ja: `${from} / ${to} 過去7日間の傾向: ${up ? '上昇' : '下落'} ${pct}%`,
+    zh: `${from} / ${to} 过去7天趋势:${up ? '上涨' : '下跌'}${pct}%`,
   }),
 };
 
@@ -1600,11 +1716,13 @@ function doConvert(){
       <div class="big">${formatNumber(converted, 2)} ${to}</div>
       <div class="small">${amount} ${from} · ${t('rateLabel')}: 1 ${from} = ${formatNumber(rate, 4)} ${to}</div>
       <div class="small" style="margin-top:6px;">${rateStatusLabel()}</div>
+      <div id="sparkline-area"></div>
       <button id="convert-share-btn" class="chip" style="margin-top:10px;">📤 ${t('shareBtn')}</button>
     </div>
   `;
   const shareBtn = document.getElementById('convert-share-btn');
   if(shareBtn) shareBtn.onclick = () => shareText(shareMsg);
+  renderSparklineArea(from, to);
 }
 
 // ---- Screen 2: camera + barcode ----
