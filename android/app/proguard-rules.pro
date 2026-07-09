@@ -91,3 +91,9 @@
 # for running the background runner script - keep it wholesale.
 # ============================================================
 -keep class io.ionic.backgroundrunner.** { *; }
+
+# ============================================================
+# @capacitor/filesystem + @capacitor/share
+# ============================================================
+-keep class com.capacitorjs.plugins.filesystem.** { *; }
+-keep class com.capacitorjs.plugins.share.** { *; }
