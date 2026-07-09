@@ -938,6 +938,7 @@ const TRANSLATIONS = {
   notifPermissionDenied: {de:'Benachrichtigungsberechtigung nicht erteilt. Das Produkt wurde zur Watchliste hinzugefuegt, aber du erhaeltst keine Erinnerungen.', tr:'Bildirim izni verilmedi. Ürünü takip listene ekledik ama hatırlatma alamayacaksın.', en:'Notification permission was not granted. The product was added to your watchlist, but you will not receive reminders.', ja:'通知の許可が拒否されました。商品はウォッチリストに追加されましたが、リマインダーは届きません。', zh:'未授予通知权限。商品已添加到您的关注列表,但您将不会收到提醒。'},
   refreshBtn: {de:'Aktualisieren', tr:'Yenile', en:'Refresh', ja:'更新', zh:'刷新'},
   exportBtn: {de:'Sichern', tr:'Yedekle', en:'Backup', ja:'バックアップ', zh:'备份'},
+  exportFileBtn: {de:'Als Datei teilen', tr:'Dosya Olarak Paylaş', en:'Share as File', ja:'ファイルとして共有', zh:'另存为文件分享'},
   importBtn: {de:'Wiederherstellen', tr:'Geri Yükle', en:'Restore', ja:'復元', zh:'恢复'},
   exportSuccess: {de:'Sicherung in die Zwischenablage kopiert.', tr:'Yedek panoya kopyalandı. İstediğin bir yere (not, e-posta) kaydedebilirsin.', en:'Backup copied to clipboard. You can save it anywhere (notes, email).', ja:'バックアップがクリップボードにコピーされました。', zh:'备份已复制到剪贴板。'},
   importPrompt: {de:'Fuege deinen Sicherungstext hier ein:', tr:'Yedek metnini buraya yapıştır:', en:'Paste your backup text here:', ja:'バックアップテキストをここに貼り付けてください:', zh:'请在此粘贴备份文本:'},
@@ -1813,7 +1814,7 @@ async function confirmEditTrackedItem(id){
   render();
 }
 
-async function exportBackup(){
+function buildBackupText(){
   const items = getTrackedItems();
   const history = getSearchHistory();
   const backupObj = {
@@ -1823,7 +1824,11 @@ async function exportBackup(){
     tracked: items,
     searchHistory: history,
   };
-  const text = btoa(unescape(encodeURIComponent(JSON.stringify(backupObj))));
+  return btoa(unescape(encodeURIComponent(JSON.stringify(backupObj))));
+}
+
+async function exportBackup(){
+  const text = buildBackupText();
   try{
     if(navigator.clipboard && navigator.clipboard.writeText){
       await navigator.clipboard.writeText(text);
@@ -1838,6 +1843,33 @@ async function exportBackup(){
     showToast(t('exportSuccess'));
   }catch(e){
     console.log('Export hatasi:', e.message);
+  }
+}
+
+async function exportBackupFile(){
+  const text = buildBackupText();
+  const fileName = `fiyatla-yedek-${new Date().toISOString().slice(0,10)}.txt`;
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share){
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+      const writeResult = await Filesystem.writeFile({
+        path: fileName,
+        data: text,
+        directory: 'CACHE',
+        encoding: 'utf8',
+      });
+      await Share.share({
+        title: t('exportFileBtn'),
+        url: writeResult.uri,
+      });
+      showToast(t('exportSuccess'));
+    }else if(navigator.share){
+      await navigator.share({ text: text, title: t('exportFileBtn') });
+    }else{
+      await exportBackup();
+    }
+  }catch(e){
+    console.log('Dosya paylasim hatasi:', e.message);
   }
 }
 
@@ -2263,6 +2295,7 @@ function renderTracking(){
       <p class="sub">${t('trackingSub')}</p>
         <div class="row" style="margin-top:10px;">
           <button class="chip" style="flex:1;" onclick="exportBackup()">💾 ${t('exportBtn')}</button>
+          <button class="chip" style="flex:1;" onclick="exportBackupFile()">📤 ${t('exportFileBtn')}</button>
           <button class="chip" style="flex:1;" onclick="importBackup()">📥 ${t('importBtn')}</button>
         </div>
     </header>
