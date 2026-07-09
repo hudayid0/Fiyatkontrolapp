@@ -694,8 +694,6 @@ function ccyName(code){
   return n ? (n[state.lang] || n.tr) : code;
 }
 
-const RATE_DATE = '2 Temmuz 2026';
-
 function rateDateLabel(){
   const dates = {
     tr: '2 Temmuz 2026',
@@ -1590,14 +1588,6 @@ function resetCamBox(){
 }
 
 // ---- Product lookup (Open Food Facts - real API) ----
-function testCrashlytics(){
-  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseCrashlytics){
-    window.Capacitor.Plugins.FirebaseCrashlytics.crash({message: 'Test crash from Fiyatla'});
-  }else{
-    alert('FirebaseCrashlytics eklentisi bulunamadi. Native tarafta kurulu mu kontrol et.');
-  }
-}
-
 function maybeShowOnboarding(openCount){
   if(openCount !== 1) return;
   showOnboardingModal();
