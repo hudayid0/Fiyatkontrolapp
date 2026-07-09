@@ -260,6 +260,8 @@ const TRANSLATIONS = {
   countryFrance: {tr:'Fransa', en:'France', de:'Frankreich', ja:'フランス', zh:'法国'},
   countryUK: {tr:'İngiltere', en:'UK', de:'Grossbritannien', ja:'イギリス', zh:'英国'},
   countryTurkey: {tr:'Türkiye', en:'Turkey', de:'Tuerkei', ja:'トルコ', zh:'土耳其'},
+  rateLabel: {tr:'kur', en:'rate', de:'Kurs', ja:'レート', zh:'汇率'},
+  trackThisProductBtn: {tr:'🔔 Bu ürünü takip et', en:'🔔 Track this product', de:'🔔 Dieses Produkt verfolgen', ja:'🔔 この商品を追跡', zh:'🔔 关注此商品'},
 };
 
 const TRANSLATIONS_FN = {
@@ -796,7 +798,7 @@ function doConvert(){
   resultBox.innerHTML = `
     <div class="result">
       <div class="big">${formatNumber(converted, 2)} ${to}</div>
-      <div class="small">${amount} ${from} · kur: 1 ${from} = ${formatNumber(rate, 4)} ${to}</div>
+      <div class="small">${amount} ${from} · ${t('rateLabel')}: 1 ${from} = ${formatNumber(rate, 4)} ${to}</div>
       <div class="small" style="margin-top:6px;">${rateStatusLabel()}</div>
       <button id="convert-share-btn" class="chip" style="margin-top:10px;">📤 ${t('shareBtn')}</button>
     </div>
@@ -1398,7 +1400,7 @@ function renderProductResult(p, code){
         </div>
       </div>
     </div>
-    <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">🔔 Bu ürünü takip et</button>
+    <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">${t('trackThisProductBtn')}</button>
     ${comparison}
   `;
 
