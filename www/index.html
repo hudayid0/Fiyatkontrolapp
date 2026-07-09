@@ -1036,6 +1036,11 @@ function setLanguage(lang){
   state.lang = lang;
   try{ localStorage.setItem('fiyatla_lang', lang); }catch(e){}
   document.documentElement.lang = lang;
+  const defaultCcy = LANG_TO_CCY[lang];
+  if(defaultCcy){
+    state.fromCcy = defaultCcy;
+    state.toCcy = defaultCcy === 'EUR' ? 'USD' : 'EUR';
+  }
   render();
 }
 
