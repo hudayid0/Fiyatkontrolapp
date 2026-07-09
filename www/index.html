@@ -1039,7 +1039,7 @@ function setLanguage(lang){
   const defaultCcy = LANG_TO_CCY[lang];
   if(defaultCcy){
     state.fromCcy = defaultCcy;
-    state.toCcy = defaultCcy === 'EUR' ? 'USD' : 'EUR';
+    state.toCcy = defaultCcy === 'USD' ? 'EUR' : 'USD';
   }
   render();
 }
@@ -1065,7 +1065,7 @@ let savedThemeOverride = null;
 try{ savedThemeOverride = localStorage.getItem('fiyatla_theme_override') || null; }catch(e){}
 
 const initialFromCcy = LANG_TO_CCY[savedLang] || 'TRY';
-const initialToCcy = initialFromCcy === 'EUR' ? 'USD' : 'EUR';
+const initialToCcy = initialFromCcy === 'USD' ? 'EUR' : 'USD';
 let state = { screen: 'home', stream: null, fromCcy: initialFromCcy, toCcy: initialToCcy, lang: savedLang, themeOverride: savedThemeOverride };
 
 function systemPrefersDark(){
