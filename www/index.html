@@ -681,13 +681,13 @@
 const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY'];
 
 const CURRENCY_NAMES = {
-  TRY: {tr:'Türk Lirası', en:'Turkish Lira', ja:'トルコリラ', zh:'土耳其里拉'},
-  USD: {tr:'ABD Doları', en:'US Dollar', ja:'米ドル', zh:'美元'},
-  GBP: {tr:'İngiliz Sterlini', en:'British Pound', ja:'英ポンド', zh:'英镑'},
-  EUR: {tr:'Euro', en:'Euro', ja:'ユーロ', zh:'欧元'},
-  JPY: {tr:'Japon Yeni', en:'Japanese Yen', ja:'日本円', zh:'日元'},
-  CHF: {tr:'İsviçre Frangı', en:'Swiss Franc', ja:'スイスフラン', zh:'瑞士法郎'},
-  CNY: {tr:'Çin Yuanı', en:'Chinese Yuan', ja:'中国元', zh:'人民币'},
+  TRY: {de:'Tuerkische Lira', tr:'Türk Lirası', en:'Turkish Lira', ja:'トルコリラ', zh:'土耳其里拉'},
+  USD: {de:'US-Dollar', tr:'ABD Doları', en:'US Dollar', ja:'米ドル', zh:'美元'},
+  GBP: {de:'Britisches Pfund', tr:'İngiliz Sterlini', en:'British Pound', ja:'英ポンド', zh:'英镑'},
+  EUR: {de:'Euro', tr:'Euro', en:'Euro', ja:'ユーロ', zh:'欧元'},
+  JPY: {de:'Japanischer Yen', tr:'Japon Yeni', en:'Japanese Yen', ja:'日本円', zh:'日元'},
+  CHF: {de:'Schweizer Franken', tr:'İsviçre Frangı', en:'Swiss Franc', ja:'スイスフラン', zh:'瑞士法郎'},
+  CNY: {de:'Chinesischer Yuan', tr:'Çin Yuanı', en:'Chinese Yuan', ja:'中国元', zh:'人民币'},
 };
 function ccyName(code){
   const n = CURRENCY_NAMES[code];
@@ -767,7 +767,7 @@ function rateStatusLabel(){
   if(ratesLive && ratesLastUpdated){
     const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
     const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
-    const labels = {
+    const labels = {de: `Live-Kurs · Stand ${hh}:${mm}`, 
       tr: `Canlı kur · saat ${hh}:${mm} itibarıyla`,
       en: `Live rate · as of ${hh}:${mm}`,
       ja: `ライブレート · ${hh}:${mm}時点`,
@@ -780,7 +780,7 @@ function rateStatusLabel(){
     const mo = String(ratesLastUpdated.getMonth()+1).padStart(2,'0');
     const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
     const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
-    const labelsCache = {
+    const labelsCache = {de: `Offline · letzter Kurs: ${dd}.${mo} ${hh}:${mm}`, 
       tr: `Bağlantı yok · son kur: ${dd}.${mo} ${hh}:${mm}`,
       en: `Offline · last rate: ${dd}.${mo} ${hh}:${mm}`,
       ja: `オフライン · 最終レート: ${dd}.${mo} ${hh}:${mm}`,
@@ -788,7 +788,7 @@ function rateStatusLabel(){
     };
     return labelsCache[state.lang] || labelsCache.tr;
   }
-  const labels2 = {
+  const labels2 = {de: `Fester Kurs (offline) · ${RATE_DATE}`, 
     tr: `Sabit kur (bağlantı yok) · ${RATE_DATE}`,
     en: `Fixed rate (offline) · ${RATE_DATE}`,
     ja: `固定レート(オフライン) · ${RATE_DATE}`,
@@ -931,6 +931,14 @@ const TRANSLATIONS = {
   stateOff: {de:'Aus', tr:'Kapalı', en:'Off', ja:'オフ', zh:'关'},
   egLabel: {tr:'Örn.', en:'E.g.', de:'Z.B.', ja:'例:', zh:'例如:'},
   trackingDisclaimer: {tr:'Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.', en:'Note: Since price data is currently simulated, real-time "price drop" detection is not possible. This reminder sends a "check again" message at regular intervals via your phone\'s notification system.', de:'Hinweis: Da die Preisdaten derzeit simuliert werden, ist eine Echtzeit-Erkennung von Preissenkungen nicht moeglich. Diese Erinnerung sendet in regelmaessigen Abstaenden eine "erneut pruefen"-Nachricht ueber das Benachrichtigungssystem deines Telefons.', ja:'注: 現在価格データはシミュレートされているため、リアルタイムの「値下げ」検出はできません。このリマインダーは、お使いの携帯電話の通知システムを通じて定期的に「再確認」メッセージを送信します。', zh:'注意:由于价格数据目前是模拟的,无法进行实时"降价"检测。此提醒将通过您手机的通知系统定期发送"重新检查"消息。'},
+  appErrorMessage: {tr:'Bir şeyler ters gitti.', en:'Something went wrong.', de:'Etwas ist schiefgelaufen.', ja:'問題が発生しました。', zh:'出了点问题。'},
+  restartBtn: {tr:'Yeniden Başlat', en:'Restart', de:'Neu starten', ja:'再起動', zh:'重新启动'},
+  selectTwoCurrencies: {tr:'Lütfen farklı iki para birimi seç.', en:'Please select two different currencies.', de:'Bitte waehle zwei unterschiedliche Waehrungen.', ja:'2つの異なる通貨を選択してください。', zh:'请选择两种不同的货币。'},
+  calculatedWithApp: {tr:'Fiyatla ile hesaplandı', en:'calculated with Fiyatla', de:'berechnet mit Fiyatla', ja:'Fiyatlaで計算', zh:'由Fiyatla计算'},
+  countryGermany: {tr:'Almanya', en:'Germany', de:'Deutschland', ja:'ドイツ', zh:'德国'},
+  countryFrance: {tr:'Fransa', en:'France', de:'Frankreich', ja:'フランス', zh:'法国'},
+  countryUK: {tr:'İngiltere', en:'UK', de:'Grossbritannien', ja:'イギリス', zh:'英国'},
+  countryTurkey: {tr:'Türkiye', en:'Turkey', de:'Tuerkei', ja:'トルコ', zh:'土耳其'},
 };
 
 const TRANSLATIONS_FN = {
@@ -975,6 +983,13 @@ const TRANSLATIONS_FN = {
     en: `${score}% match`,
     ja: `一致度 ${score}%`,
     zh: `匹配度 ${score}%`,
+  }),
+  notifBody: (name, price) => ({
+    tr: `${name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${price})`,
+    en: `Time to check prices again for ${name} (your target: €${price})`,
+    de: `Zeit, die Preise fuer ${name} erneut zu pruefen (dein Ziel: ${price} Euro)`,
+    ja: `${name}の価格を再確認する時間です(目標: €${price})`,
+    zh: `该重新检查${name}的价格了(目标: €${price})`,
   }),
 };
 
@@ -1107,7 +1122,7 @@ function renderAdCloseButton(){
     el.className = 'ad-close-wrap';
     document.body.insertBefore(el, document.body.firstChild);
   }
-  const closeLabels = {tr:'Reklamı kapat', en:'Close ad', ja:'広告を閉じる', zh:'关闭广告'};
+  const closeLabels = {de:'Werbung schliessen', tr:'Reklamı kapat', en:'Close ad', ja:'広告を閉じる', zh:'关闭广告'};
   const label = closeLabels[state.lang] || closeLabels.tr;
   el.innerHTML = `<button class="ad-close-btn" onclick="toggleAds()">${label} ✕</button>`;
 }
@@ -1135,7 +1150,7 @@ function render(){
     console.log('Render hatasi:', err.message);
     try{
       state.screen = 'home';
-      app.innerHTML = '<div style="padding:40px 24px; text-align:center;"><p style="font-size:15px; margin-bottom:16px;">Bir şeyler ters gitti.</p><button class="primary" onclick="location.reload()">Yeniden Başlat</button></div>';
+      app.innerHTML = '<div style="padding:40px 24px; text-align:center;"><p style="font-size:15px; margin-bottom:16px;">' + t('appErrorMessage') + '</p><button class="primary" onclick="location.reload()">' + t('restartBtn') + '</button></div>';
     }catch(e2){}
   }
 }
@@ -1451,12 +1466,12 @@ function doConvert(){
     return;
   }
   if(from === to){
-    resultBox.innerHTML = `<div class="error">Lütfen farklı iki para birimi seç.</div>`;
+    resultBox.innerHTML = `<div class="error">${t('selectTwoCurrencies')}</div>`;
     return;
   }
   const converted = convertAmount(amount, from, to);
   const rate = crossRate(from, to);
-  const shareMsg = `${amount} ${from} = ${formatNumber(converted, 2)} ${to} (Fiyatla ile hesaplandı)`;
+  const shareMsg = `${amount} ${from} = ${formatNumber(converted, 2)} ${to} (${t('calculatedWithApp')})`;
   resultBox.innerHTML = `
     <div class="result">
       <div class="big">${formatNumber(converted, 2)} ${to}</div>
@@ -1759,7 +1774,7 @@ async function confirmEditTrackedItem(id){
         notifications: [{
           id: newNotifId,
           title: 'Fiyat Takibi - Fiyatla',
-          body: `${item.name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${formatNumber(target, 2)})`,
+          body: td('notifBody', item.name, formatNumber(target, 2)),
           schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
         }]
       });
@@ -2120,10 +2135,10 @@ function renderAdBanner(){
 function buildComparison(name, brand){
   const query = `${brand} ${name}`.trim();
   const variants = [
-    {country:'🇩🇪 Almanya', store:'amazon.de', label: `${brand} ${name}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
-    {country:'🇫🇷 Fransa', store:'amazon.fr', label: `${name} - ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
-    {country:'🇬🇧 İngiltere', store:'amazon.co.uk', label: `${name}, ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
-    {country:'🇹🇷 Türkiye', store:'hepsiburada.com', label: `${brand} ${name} TR`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇩🇪 ' + t('countryGermany'), store:'amazon.de', label: `${brand} ${name}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇫🇷 ' + t('countryFrance'), store:'amazon.fr', label: `${name} - ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇬🇧 ' + t('countryUK'), store:'amazon.co.uk', label: `${name}, ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇹🇷 ' + t('countryTurkey'), store:'hepsiburada.com', label: `${brand} ${name} TR`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
   ];
   variants.forEach(v => {
     v.score = similarity(query, v.label);
@@ -2237,7 +2252,7 @@ async function trackProduct(name, brand, code, targetPrice){
       notifications: [{
         id: notifId,
         title: 'Fiyat Takibi - Fiyatla',
-        body: `${name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${formatNumber(targetPrice, 2)})`,
+        body: td('notifBody', name, formatNumber(targetPrice, 2)),
         schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
       }]
     });
@@ -2560,6 +2575,7 @@ function showToast(message){
 
 function exitToastMessage(){
   const msgs = {
+    de: 'Tippe erneut zum Beenden',
     tr: 'Çıkmak için tekrar dokun',
     en: 'Tap again to exit',
     ja: 'もう一度タップして終了',
