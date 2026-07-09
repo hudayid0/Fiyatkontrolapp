@@ -59,6 +59,7 @@
 
 <h2>6. Bildirimler</h2>
 <p>Fiyat takip hatırlatmaları tamamen cihazında, yerel olarak planlanır (Android'in kendi bildirim sistemi üzerinden). Bu bildirimler için hiçbir veri bir sunucuya gönderilmez.</p>
+<p>Ayrıca, takip listene eklediğin ürünler için, uygulama kapalıyken bile günde yaklaşık bir kez, Android'in arka plan görev sistemi (WorkManager) üzerinden otomatik bir fiyat kontrolü çalışır. Bu kontrol sırasında yalnızca takip ettiğin ürünlerin barkod numaraları, ürün bilgisini almak için UPCitemdb servisine gönderilir (bkz. Madde 3) — kişisel kimlik bilgisi içermez. Gerçek bir satıcı fiyatı bulunur ve hedef fiyatına ulaşılırsa, cihazında yerel bir bildirim oluşturulur. Bu kontrol için hiçbir veri bizim sunucularımıza gönderilmez; her şey cihazında ve doğrudan UPCitemdb ile aramızda gerçekleşir. Bu arka plan görevi, cihazının pil optimizasyonu ayarlarına bağlı olarak ertelenebilir veya çalışmayabilir.</p>
 
 <h2>7. Ortaklık (affiliate) bağlantıları</h2>
 <p>Karşılaştırma sonuçlarındaki "Git" bağlantıları, seni üçüncü taraf mağaza web sitelerine yönlendirir. Bu sitelerdeki veri toplama uygulamaları, o sitenin kendi gizlilik politikasına tabidir, bizim kontrolümüzde değildir.</p>
@@ -102,6 +103,7 @@
 
 <h2>6. Notifications</h2>
 <p>Price tracking reminders are scheduled entirely on-device via Android's local notification system. No data is sent to any server for this feature.</p>
+<p>Additionally, for products in your watchlist, an automatic price check runs roughly once a day via Android's background task system (WorkManager), even while the App is closed. During this check, only the barcode numbers of your tracked products are sent to the UPCitemdb service to retrieve product pricing (see Section 3) — no personally identifying information is included. If a real merchant price is found and your target price is reached, a local notification is created on your device. No data from this check is sent to any server of ours; it happens directly between your device and UPCitemdb. This background task may be delayed or skipped depending on your device's battery optimization settings.</p>
 
 <h2>7. Affiliate links</h2>
 <p>"Go" links in comparison results redirect you to third-party retailer websites. Data practices on those sites are governed by their own privacy policies, outside our control.</p>
