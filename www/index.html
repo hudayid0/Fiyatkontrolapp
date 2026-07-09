@@ -898,6 +898,8 @@ const TRANSLATIONS = {
   searchingWiderDb: {de:'Suche in weiteren Produktkategorien...', tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
   invalidBarcodeChecksum: {de:'Diese Barcode-Nummer scheint ungueltig zu sein.', tr:'Bu barkod numarası geçersiz görünüyor (kontrol basamağı tutmuyor). Numarayı kontrol et.', en:'This barcode number appears invalid (checksum mismatch). Please check the number.', ja:'このバーコード番号は無効のようです(チェックデジットが一致しません)。番号を確認してください。', zh:'此条码号似乎无效(校验位不匹配)。请检查号码。'},
   editBtn: {de:'Bearbeiten', tr:'Düzenle', en:'Edit', ja:'編集', zh:'编辑'},
+  checkNowBtn: {de:'🔄 Jetzt pruefen', tr:'🔄 Şimdi Kontrol Et', en:'🔄 Check Now', ja:'🔄 今すぐ確認', zh:'🔄 立即检查'},
+  checkingPriceNow: {de:'Preis wird geprueft...', tr:'Fiyat kontrol ediliyor...', en:'Checking price...', ja:'価格を確認中...', zh:'正在检查价格...'},
   experimentalTag: {de:'Beta', tr:'Beta', en:'Beta', ja:'Beta', zh:'Beta'},
   sourceOff: {de:'Quelle: Open Food Facts', tr:'Kaynak: Open Food Facts', en:'Source: Open Food Facts', ja:'情報源: Open Food Facts', zh:'来源: Open Food Facts'},
   sourceUpc: {de:'Quelle: UPCitemdb (Community-Daten, ungeprueft)', tr:'Kaynak: UPCitemdb (topluluk verisi, doğrulanmamış)', en:'Source: UPCitemdb (community data, unverified)', ja:'情報源: UPCitemdb(コミュニティデータ、未検証)', zh:'来源: UPCitemdb(社区数据,未经验证)'},
@@ -1010,6 +1012,27 @@ const TRANSLATIONS_FN = {
     de: `Zeit, die Preise fuer ${name} erneut zu pruefen (dein Ziel: ${price} Euro)`,
     ja: `${name}の価格を再確認する時間です(目標: €${price})`,
     zh: `该重新检查${name}的价格了(目标: €${price})`,
+  }),
+  checkNowTargetReached: (name, price) => ({
+    tr: `✅ ${name}: Hedef fiyata ulaşıldı! Güncel: €${price}`,
+    en: `✅ ${name}: Target price reached! Current: €${price}`,
+    de: `✅ ${name}: Zielpreis erreicht! Aktuell: €${price}`,
+    ja: `✅ ${name}: 目標価格に到達しました!現在: €${price}`,
+    zh: `✅ ${name}: 已达到目标价格!当前: €${price}`,
+  }),
+  checkNowPriceFound: (name, price) => ({
+    tr: `🔍 ${name}: Güncel gerçek fiyat €${price} (hedefe henüz ulaşılmadı)`,
+    en: `🔍 ${name}: Current real price €${price} (target not reached yet)`,
+    de: `🔍 ${name}: Aktueller echter Preis €${price} (Ziel noch nicht erreicht)`,
+    ja: `🔍 ${name}: 現在の実際の価格 €${price}(まだ目標未達)`,
+    zh: `🔍 ${name}: 当前真实价格 €${price}(尚未达到目标)`,
+  }),
+  checkNowNoData: (name) => ({
+    tr: `❓ ${name} için gerçek fiyat verisi bulunamadı`,
+    en: `❓ No real price data found for ${name}`,
+    de: `❓ Keine echten Preisdaten fuer ${name} gefunden`,
+    ja: `❓ ${name}の実際の価格データが見つかりません`,
+    zh: `❓ 未找到${name}的真实价格数据`,
   }),
 };
 
@@ -2230,8 +2253,8 @@ function renderTracking(){
       ${tracked.length === 0 ? `
         <div class="note">${t('trackEmpty')}</div>
       ` : tracked.map(item => `
-        <div class="product-card">
-          <div style="flex:1;">
+        <div class="product-card" style="flex-direction:column; align-items:stretch;">
+          <div>
             <div class="pname">${item.name}</div>
             <div class="pbrand">${item.brand} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
             <div style="margin-top:4px;">
@@ -2240,8 +2263,11 @@ function renderTracking(){
                 : `<span class="match-tag match-mid">${t('trackingReminderOnly')}</span>`}
             </div>
           </div>
-          <button class="go-btn" onclick="editTrackedItem('${item.id}')">${t('editBtn')}</button>
-          <button class="go-btn" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
+          <div class="row" style="margin-top:10px;">
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="checkPriceNow('${item.id}')">${t('checkNowBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="editTrackedItem('${item.id}')">${t('editBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
+          </div>
         </div>
       `).join('')}
       <div class="note">${t('trackingDisclaimer')}</div>
@@ -2367,6 +2393,32 @@ async function trackProduct(name, brand, code, targetPrice){
   if(notifId){
     showToast(td('trackSuccess', name));
   }
+}
+
+async function checkPriceNow(id){
+  const items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+
+  showToast(t('checkingPriceNow'));
+
+  const offers = await fetchRealOffers(item.code);
+  const rows = offers ? realOffersToEur(offers) : [];
+
+  item.hasRealPriceData = rows.length > 0;
+  saveTrackedItems(items);
+
+  if(rows.length === 0){
+    showToast(td('checkNowNoData', item.name));
+  }else{
+    const lowestEur = rows[0].priceEur;
+    if(lowestEur <= item.targetPrice){
+      showToast(td('checkNowTargetReached', item.name, formatNumber(lowestEur, 2)));
+    }else{
+      showToast(td('checkNowPriceFound', item.name, formatNumber(lowestEur, 2)));
+    }
+  }
+  render();
 }
 
 async function untrackProduct(id){
