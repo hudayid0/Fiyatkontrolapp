@@ -1194,10 +1194,7 @@ function sendFeedback(){
 }
 
 function confirmClearAllData(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'clear-data-modal-overlay';
-  overlay.innerHTML = `
+  openModal('clear-data-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">⚠️ ${t('clearDataTitle')}</p>
       <p class="modal-sub">${t('clearDataWarning')}</p>
@@ -1206,17 +1203,11 @@ function confirmClearAllData(){
         <button class="modal-btn-primary" style="background:var(--danger); color:#fff;" onclick="executeClearAllData()">${t('clearDataConfirmBtn')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeClearDataModal(){
-  const el = document.getElementById('clear-data-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('clear-data-modal-overlay');
 }
 
 function executeClearAllData(){
@@ -1594,10 +1585,7 @@ function maybeShowOnboarding(openCount){
 }
 
 function showOnboardingModal(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'onboarding-modal-overlay';
-  overlay.innerHTML = `
+  openModal('onboarding-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">👋 ${t('onboardingTitle')}</p>
       <p class="modal-sub">${t('onboardingIntro')}</p>
@@ -1608,17 +1596,11 @@ function showOnboardingModal(){
         <button class="modal-btn-primary" style="width:100%;" onclick="closeOnboardingModal()">${t('onboardingStartBtn')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeOnboardingModal(){
-  const el = document.getElementById('onboarding-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('onboarding-modal-overlay');
 }
 
 const APP_VERSION = '1.0.0';
@@ -1698,10 +1680,7 @@ function maybeShowRatePrompt(openCount){
 }
 
 function showRateModal(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'rate-modal-overlay';
-  overlay.innerHTML = `
+  openModal('rate-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">⭐ ${t('rateTitle')}</p>
       <p class="modal-sub">${t('rateMessage')}</p>
@@ -1711,17 +1690,11 @@ function showRateModal(){
       </div>
       <button class="chip" style="margin-top:12px; width:100%; text-align:center;" onclick="rateNever()">${t('rateNeverBtn')}</button>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeRateModal(){
-  const el = document.getElementById('rate-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('rate-modal-overlay');
 }
 
 function rateNow(){
@@ -1749,10 +1722,7 @@ function editTrackedItem(id){
   if(!item) return;
   const numericTarget = Number(item.targetPrice);
   const targetValue = Number.isFinite(numericTarget) ? numericTarget.toFixed(2) : '0.00';
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'track-modal-overlay';
-  overlay.innerHTML = `
+  openModal('track-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
       <h3 class="modal-title" id="modal-a11y-title">${item.name}</h3>
@@ -1763,9 +1733,7 @@ function editTrackedItem(id){
         <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${id}')">${t('trackConfirm')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 async function confirmEditTrackedItem(id){
@@ -1836,10 +1804,7 @@ async function exportBackup(){
 }
 
 function importBackup(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'import-modal-overlay';
-  overlay.innerHTML = `
+  openModal('import-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">${t('importBtn')}</p>
       <p class="modal-sub">${t('importPrompt')}</p>
@@ -1849,17 +1814,11 @@ function importBackup(){
         <button class="modal-btn-primary" onclick="confirmImportBackup()">${t('importBtn')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeImportModal(){
-  const el = document.getElementById('import-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('import-modal-overlay');
 }
 
 function confirmImportBackup(){
@@ -2333,10 +2292,7 @@ async function untrackProduct(id){
 function promptTrackProduct(name, brand, code){
   const safeName2 = name.replace(/'/g, "\\'");
   const safeBrand2 = brand.replace(/'/g, "\\'");
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'track-modal-overlay';
-  overlay.innerHTML = `
+  openModal('track-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
       <h3 class="modal-title" id="modal-a11y-title">${name}</h3>
@@ -2347,9 +2303,25 @@ function promptTrackProduct(name, brand, code){
         <button class="modal-btn-primary" onclick="confirmTrackProduct('${safeName2}','${safeBrand2}','${code}')">${t('trackConfirm')}</button>
       </div>
     </div>
-  `;
+  `);
+}
+
+function openModal(id, innerHtml){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = id;
+  overlay.innerHTML = innerHtml;
   document.body.appendChild(overlay);
   initModalA11y(overlay);
+  return overlay;
+}
+
+function closeModal(id){
+  const el = document.getElementById(id);
+  if(el){
+    if(el._a11yCleanup) el._a11yCleanup();
+    el.remove();
+  }
 }
 
 function initModalA11y(overlay){
@@ -2382,11 +2354,7 @@ function initModalA11y(overlay){
 }
 
 function closeTrackModal(){
-  const overlay = document.getElementById('track-modal-overlay');
-  if(overlay){
-    if(overlay._a11yCleanup) overlay._a11yCleanup();
-    overlay.remove();
-  }
+  closeModal('track-modal-overlay');
 }
 
 function confirmTrackProduct(name, brand, code){
