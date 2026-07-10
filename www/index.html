@@ -2281,6 +2281,26 @@ async function lookupBarcode(){
   }
 }
 
+// search.openfoodfacts.org (search-a-licious, beta) does not send permissive
+// CORS headers like the stable world.openfoodfacts.org API does, so a plain
+// WebView fetch() to it fails with "Failed to fetch" before any response is
+// even read. Native platforms aren't subject to browser CORS, so route
+// through Capacitor's built-in native HTTP client there; fall back to fetch()
+// on plain web (e.g. local testing) where CapacitorHttp isn't present.
+async function nativeGet(url){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp){
+    const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url });
+    let data = res.data;
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){}
+    }
+    return { ok: res.status >= 200 && res.status < 300, status: res.status, data };
+  }
+  const res = await fetch(url);
+  const data = await res.json();
+  return { ok: res.ok, status: res.status, data };
+}
+
 // ---- Product search by name (Open Food Facts search API) ----
 async function searchByName(){
   if(!debounceAction('searchByName')) return;
@@ -2293,11 +2313,15 @@ async function searchByName(){
   addToHistory('name', query);
   box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingText')}</div>`;
   try{
-    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=5`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const products = (data.hits || data.products || []).filter(p => p.product_name);
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=5&fields=code,product_name,brands,image_front_small_url`;
+    const { ok, data } = await nativeGet(url);
+    if(!ok) throw new Error('API hatasi');
+    const rawResults = data.hits || data.products || [];
+    const products = rawResults
+      .map(p => ({ ...p, product_name: p.product_name || p.product_name_tr || p.product_name_en || p.generic_name || '' }))
+      .filter(p => p.product_name);
     if(products.length === 0){
+      console.log('Isimle arama: sonuc bulunamadi. Ham yanit ornegi:', JSON.stringify(data).slice(0, 500));
       box.innerHTML = `<div class="error">${td('noResultsFor', query)}</div>`;
       return;
     }
@@ -2316,6 +2340,7 @@ async function searchByName(){
     `;
     state.lastSearchResults = products;
   }catch(err){
+    console.log('Isimle arama hatasi:', err.message);
     box.innerHTML = `<div class="error">${t('nameSearchUnstable')}</div>`;
   }
 }
