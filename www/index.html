@@ -2238,12 +2238,14 @@ function setCachedProduct(code, product){
   }catch(e){}
 }
 
-// Gercek fiyat verisi artik UPCitemDB'den degil, Claude'un web arama
-// aracini kullanan kendi Vercel backend'imizden (/api/price-lookup) geliyor.
-// Backend gunluk/dakikalik limit veya Anthropic tarafi 429/529 donerse ayni
-// sekilde HTTP 429 ile cevap verir; bunu sessizce "veri yok" ile
-// karistirmamak icin ozel bir isaretci (sentinel) string donuyoruz -
-// cagiran taraflar bunu Array.isArray() ile ayirt edebilir.
+// Gercek fiyat verisi artik UPCitemDB'den degil, ayri ve private tutulan
+// "fiyatla-backend" reposundan (Vercel'e deploy edilir) geliyor - bu
+// backend'in ic mantigi (prompt, model secimi, JSON semasi) burada yok,
+// sadece asagidaki URL'e HTTP istegi atiliyor. Backend gunluk/dakikalik
+// limit veya Anthropic tarafi 429/529 donerse ayni sekilde HTTP 429 ile
+// cevap verir; bunu sessizce "veri yok" ile karistirmamak icin ozel bir
+// isaretci (sentinel) string donuyoruz - cagiran taraflar bunu
+// Array.isArray() ile ayirt edebilir.
 const UPCITEMDB_RATE_LIMITED = 'RATE_LIMITED';
 
 // Vercel'e deploy ettikten sonra projenin gercek alan adiyla guncelle
