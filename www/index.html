@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Kur & Fiyat Kontrol</title>
+<title>Fiyatla</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -173,6 +173,15 @@
   }
   select{font-family:'Inter',sans-serif; font-size:14.5px;}
   input:focus, select:focus{border-color:var(--gold);}
+
+  /* Klavye/TalkBack gibi klavye-benzeri navigasyon icin gorunur odak
+     halkasi - :focus-visible kullanildigi icin dokunmatik tiklamalarda
+     gereksiz gorsel gurultu olusturmaz, sadece klavye/erisilebilirlik
+     navigasyonunda belirir. */
+  button:focus-visible, a:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--teal);
+    outline-offset:2px;
+  }
 
   .swap-btn{
     background:var(--surface-2);
@@ -1259,6 +1268,11 @@ try{ savedThemeOverride = localStorage.getItem('fiyatla_theme_override') || null
 const initialFromCcy = LANG_TO_CCY[savedLang] || 'TRY';
 const initialToCcy = initialFromCcy === 'USD' ? 'EUR' : 'USD';
 let state = { screen: 'home', stream: null, fromCcy: initialFromCcy, toCcy: initialToCcy, lang: savedLang, themeOverride: savedThemeOverride };
+// <html lang="tr"> statik olarak yazilmisti; kaydedilmis bir dil tercihi
+// varsa (ekran okuyucular/tarayici dil algilamasi icin) acilista da
+// uygulanmali - onceden sadece kullanici elle dil degistirdiginde
+// (setLanguage()) guncelleniyordu.
+document.documentElement.lang = savedLang;
 
 function systemPrefersDark(){
   try{
