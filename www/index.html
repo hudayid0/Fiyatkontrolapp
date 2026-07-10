@@ -1580,9 +1580,7 @@ function renderScan(){
           <label>${t('recentSearches')}</label>
           <div class="history-chips">
             ${history.map(h => {
-              const safeValue = escapeHtml(h.value);
-              const jsValue = safeValue.replace(/'/g, "\\'");
-              return `<button class="chip" onclick="rerunHistory('${h.mode}','${jsValue}')">${safeValue}</button>`;
+              return `<button class="chip" onclick="rerunHistory('${onclickSafe(h.mode)}','${onclickSafe(h.value)}')">${escapeHtml(h.value)}</button>`;
             }).join('')}
           </div>
         </div>
@@ -1946,12 +1944,12 @@ function editTrackedItem(id){
   openModal('track-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
-      <h3 class="modal-title" id="modal-a11y-title">${item.name}</h3>
+      <h3 class="modal-title" id="modal-a11y-title">${escapeHtml(item.name)}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
       <input type="number" id="target-price-input" value="${targetValue}" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
         <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
-        <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${id}')">${t('trackConfirm')}</button>
+        <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${onclickSafe(item.id)}')">${t('trackConfirm')}</button>
       </div>
     </div>
   `);
@@ -2055,6 +2053,31 @@ function closeImportModal(){
   closeModal('import-modal-overlay');
 }
 
+// Yedek metni tamamen disaridan (kullanicidan kullaniciya paylasilan bir
+// metin olarak) geliyor, guvenilir degil. Beklenmeyen alan tipleri
+// (ornegin object/array yerine gecmesi gereken string) hem render
+// asamasinda hem de sonraki islemlerde (formatNumber, notifId iptali vb.)
+// sorun cikarabilecegi icin, kaydetmeden once her ogeyi kendi beklenen
+// tipine zorlayip gecersizse atiyoruz.
+function sanitizeImportedTrackedItem(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id ?? '').slice(0, 200);
+  const name = String(raw.name ?? '').slice(0, 300);
+  if(!id || !name) return null;
+  const targetPrice = Number(raw.targetPrice);
+  return {
+    id,
+    name,
+    brand: String(raw.brand ?? '').slice(0, 300),
+    code: String(raw.code ?? '').slice(0, 50),
+    targetPrice: Number.isFinite(targetPrice) ? targetPrice : 0,
+    notifId: Number.isInteger(raw.notifId) ? raw.notifId : null,
+    hasRealPriceData: raw.hasRealPriceData === true,
+  };
+}
+
+const IMPORT_MAX_ITEMS = 500;
+
 function confirmImportBackup(){
   const input = document.getElementById('import-text-input');
   const raw = input.value.trim();
@@ -2064,8 +2087,16 @@ function confirmImportBackup(){
     if(!data || data.app !== 'fiyatla' || !Array.isArray(data.tracked)){
       throw new Error('gecersiz');
     }
-    saveTrackedItems(data.tracked);
-    saveSearchHistory(Array.isArray(data.searchHistory) ? data.searchHistory : []);
+    const sanitizedTracked = data.tracked
+      .slice(0, IMPORT_MAX_ITEMS)
+      .map(sanitizeImportedTrackedItem)
+      .filter(item => item !== null);
+    const sanitizedHistory = (Array.isArray(data.searchHistory) ? data.searchHistory : [])
+      .slice(0, IMPORT_MAX_ITEMS)
+      .filter(h => h && typeof h.value === 'string' && typeof h.mode === 'string')
+      .map(h => ({ mode: h.mode.slice(0, 20), value: h.value.slice(0, 200) }));
+    saveTrackedItems(sanitizedTracked);
+    saveSearchHistory(sanitizedHistory);
     closeImportModal();
     showToast(t('importSuccess'));
     render();
@@ -2115,6 +2146,20 @@ function escapeHtml(str){
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Bir degeri onclick="fn('${...}')" gibi inline bir olay isleyicisinin
+// tek tirnakli JS string argumanina gommek icin kullanilir. HTML nitelik
+// (attribute) degerleri once tarayici tarafindan entity-decode edilip
+// SONRA JS olarak derlendigi icin, sadece escapeHtml() yeterli degildir:
+// escapeHtml('\'') -> '&#39;' tarayicida tekrar ham '\'' karakterine
+// donusur ve JS string'ini kirar (orn. isminde kesme isareti olan
+// "Kellogg's" gibi urunlerde oldugu gibi). Once JS string kacisi
+// (ters egik cizgi, tek tirnak), sonra HTML nitelik kacisi uygulanir.
+function onclickSafe(str){
+  if(str === null || str === undefined) return '';
+  const jsEscaped = String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return escapeHtml(jsEscaped);
 }
 
 function isValidBarcodeChecksum(code){
@@ -2334,11 +2379,13 @@ function renderProductResult(p, code){
   setCachedProduct(code, p);
   logAnalyticsEvent('product_scan_success', { method: state.searchMode === 'name' ? 'name' : 'barcode', barcode: code });
   const box = document.getElementById('scan-result');
-  const name = escapeHtml(p.product_name || p.generic_name || 'Bilinmeyen ürün');
-  const brand = escapeHtml(p.brands || '—');
+  const rawName = p.product_name || p.generic_name || 'Bilinmeyen ürün';
+  const rawBrand = p.brands || '—';
+  const name = escapeHtml(rawName);
+  const brand = escapeHtml(rawBrand);
   const img = p.image_front_small_url || p.image_url || '';
-  const safeName = name.replace(/'/g, "\\'");
-  const safeBrand = brand.replace(/'/g, "\\'");
+  const safeName = onclickSafe(rawName);
+  const safeBrand = onclickSafe(rawBrand);
   box.innerHTML = `
     <div class="product-card">
       ${img ? `<img src="${img}" alt="${name}">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2);"></div>`}
@@ -2491,11 +2538,13 @@ function renderTracking(){
     <main>
       ${tracked.length === 0 ? `
         <div class="note">${t('trackEmpty')}</div>
-      ` : tracked.map(item => `
+      ` : tracked.map(item => {
+        const safeId = onclickSafe(item.id);
+        return `
         <div class="product-card" style="flex-direction:column; align-items:stretch;">
           <div>
-            <div class="pname">${item.name}</div>
-            <div class="pbrand">${item.brand} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
+            <div class="pname">${escapeHtml(item.name)}</div>
+            <div class="pbrand">${escapeHtml(item.brand)} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
             <div style="margin-top:4px;">
               ${item.hasRealPriceData
                 ? `<span class="match-tag match-high">${t('trackingRealPriceActive')}</span>`
@@ -2503,12 +2552,13 @@ function renderTracking(){
             </div>
           </div>
           <div class="row" style="margin-top:10px;">
-            <button class="go-btn" style="flex:1; text-align:center;" onclick="checkPriceNow('${item.id}')">${t('checkNowBtn')}</button>
-            <button class="go-btn" style="flex:1; text-align:center;" onclick="editTrackedItem('${item.id}')">${t('editBtn')}</button>
-            <button class="go-btn" style="flex:1; text-align:center;" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="checkPriceNow('${safeId}')">${t('checkNowBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="editTrackedItem('${safeId}')">${t('editBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="untrackProduct('${safeId}')">${t('dropBtn')}</button>
           </div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
       <div class="note">${t('trackingDisclaimer')}</div>
     </main>
     <footer>${t('footerTracking')}</footer>
@@ -2672,12 +2722,12 @@ async function untrackProduct(id){
 }
 
 function promptTrackProduct(name, brand, code){
-  const safeName2 = name.replace(/'/g, "\\'");
-  const safeBrand2 = brand.replace(/'/g, "\\'");
+  const safeName2 = onclickSafe(name);
+  const safeBrand2 = onclickSafe(brand);
   openModal('track-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
-      <h3 class="modal-title" id="modal-a11y-title">${name}</h3>
+      <h3 class="modal-title" id="modal-a11y-title">${escapeHtml(name)}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
       <input type="number" id="target-price-input" value="5.00" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
