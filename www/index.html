@@ -1200,6 +1200,13 @@ const TRANSLATIONS_FN = {
     ja: `❓ ${name}の実際の価格データが見つかりません`,
     zh: `❓ 未找到${name}的真实价格数据`,
   }),
+  checkNowRateLimited: (name) => ({
+    tr: `⏳ ${name}: Günlük fiyat sorgulama limiti doldu, lütfen yarın tekrar dene`,
+    en: `⏳ ${name}: Daily price lookup limit reached, please try again tomorrow`,
+    de: `⏳ ${name}: Taegliches Preisabfragelimit erreicht, bitte versuche es morgen erneut`,
+    ja: `⏳ ${name}: 1日の価格照会上限に達しました。明日もう一度お試しください`,
+    zh: `⏳ ${name}: 已达到每日价格查询上限，请明天再试`,
+  }),
   sparklineAria: (from, to, pct, up) => ({
     tr: `${from} / ${to} son 7 gün trendi: ${up ? 'yükseldi' : 'düştü'} %${pct}`,
     en: `${from} / ${to} 7-day trend: ${up ? 'up' : 'down'} ${pct}%`,
@@ -2231,10 +2238,17 @@ function setCachedProduct(code, product){
   }catch(e){}
 }
 
+// UPCitemDB'nin ucretsiz "trial" katmani gunde 100 istekle sinirli;
+// limit asildiginda HTTP 429 donuyor. Bunu sessizce "veri yok" ile
+// karistirmamak icin ozel bir isaretci (sentinel) string donuyoruz -
+// cagiran taraflar bunu Array.isArray() ile ayirt edebilir.
+const UPCITEMDB_RATE_LIMITED = 'RATE_LIMITED';
+
 async function fetchRealOffers(code){
   if(!code) return null;
   try{
     const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+    if(res.status === 429) return UPCITEMDB_RATE_LIMITED;
     if(!res.ok) return null;
     const data = await res.json();
     if(!data.items || data.items.length === 0) return null;
@@ -2474,7 +2488,7 @@ function renderAdBanner(){
 
 async function buildComparison(name, brand, code){
   const realOffers = await fetchRealOffers(code);
-  const realRows = realOffers ? realOffersToEur(realOffers) : [];
+  const realRows = Array.isArray(realOffers) ? realOffersToEur(realOffers) : [];
 
   if(realRows.length > 0){
     const minPrice = realRows[0].priceEur;
@@ -2705,7 +2719,7 @@ async function trackProduct(name, brand, code, targetPrice){
     fetchRealOffers(code),
   ]);
 
-  items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: !!realOffers });
+  items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: Array.isArray(realOffers) });
   saveTrackedItems(items);
   logAnalyticsEvent('product_tracked', { barcode: code, target_price: targetPrice });
   if(notifId){
@@ -2721,7 +2735,11 @@ async function checkPriceNow(id){
   showToast(t('checkingPriceNow'));
 
   const offers = await fetchRealOffers(item.code);
-  const rows = offers ? realOffersToEur(offers) : [];
+  if(offers === UPCITEMDB_RATE_LIMITED){
+    showToast(td('checkNowRateLimited', item.name));
+    return;
+  }
+  const rows = Array.isArray(offers) ? realOffersToEur(offers) : [];
 
   item.hasRealPriceData = rows.length > 0;
   saveTrackedItems(items);
