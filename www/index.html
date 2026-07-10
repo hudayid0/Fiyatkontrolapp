@@ -2354,7 +2354,7 @@ async function searchByName(){
       <div class="result-list">
         ${products.map((p,i) => `
           <button class="result-item" onclick='selectSearchResult(${i})'>
-            ${p.image_front_small_url ? `<img src="${p.image_front_small_url}">` : `<div style="width:44px;height:44px;border-radius:7px;background:var(--surface-2);"></div>`}
+            ${p.image_front_small_url ? `<img src="${escapeHtml(p.image_front_small_url)}">` : `<div style="width:44px;height:44px;border-radius:7px;background:var(--surface-2);"></div>`}
             <div>
               <div class="rname">${escapeHtml(p.product_name)}</div>
               <div class="rbrand">${escapeHtml(p.brands || '-')} - ${escapeHtml(p.code)}</div>
@@ -2388,7 +2388,7 @@ function renderProductResult(p, code){
   const safeBrand = onclickSafe(rawBrand);
   box.innerHTML = `
     <div class="product-card">
-      ${img ? `<img src="${img}" alt="${name}">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2);"></div>`}
+      ${img ? `<img src="${escapeHtml(img)}" alt="${name}">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2);"></div>`}
       <div style="flex:1;">
         <div class="pname">${name}</div>
         <div class="pbrand">${brand} · barkod ${code}</div>
