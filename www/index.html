@@ -230,6 +230,33 @@
     color:var(--text-dim);
     margin-top:4px;
   }
+  .sparkline-wrap{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+  .sparkline-label{
+    font-size:11px;
+    color:var(--text-dim);
+    flex:0 0 auto;
+  }
+  .sparkline{
+    width:100%;
+    max-width:120px;
+    height:28px;
+    flex:1 1 auto;
+  }
+  .sparkline-delta{
+    font-size:11px;
+    font-weight:600;
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  .sparkline-delta-up{color:var(--teal);}
+  .sparkline-delta-down{color:var(--danger);}
 
   /* Scan screen */
   .scan-box{
@@ -400,6 +427,26 @@
   .match-high{background:rgba(45,212,191,0.18); color:var(--teal);}
   .match-mid{background:rgba(201,162,39,0.18); color:var(--gold-soft);}
   .cheapest{color:var(--teal); font-weight:600;}
+  .data-badge{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+    font-weight:600;
+    padding:10px 12px;
+    border-radius:12px;
+    margin-bottom:10px;
+  }
+  .data-badge-real{
+    background:rgba(45,212,191,0.15);
+    color:var(--teal);
+    border:1px solid rgba(45,212,191,0.35);
+  }
+  .data-badge-fake{
+    background:rgba(232,115,74,0.15);
+    color:#E8734A;
+    border:1px solid rgba(232,115,74,0.4);
+  }
   .note{
     font-size:12px;
     color:var(--text-dim);
@@ -496,6 +543,53 @@
     font-size:14px;
     cursor:pointer;
     box-shadow:0 6px 16px rgba(201,162,39,0.28);
+  }
+  .onboarding-flow{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:2px;
+    margin:16px 0 4px;
+  }
+  .onboarding-step{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    gap:6px;
+  }
+  .onboarding-icon{
+    width:52px;
+    height:52px;
+    border-radius:50%;
+    background:var(--surface);
+    border:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:24px;
+    flex:0 0 auto;
+  }
+  .onboarding-step-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    margin:0;
+    color:var(--text);
+  }
+  .onboarding-step-sub{
+    font-size:10.5px;
+    color:var(--text-dim);
+    line-height:1.35;
+    margin:0;
+  }
+  .onboarding-arrow{
+    color:var(--text-dim);
+    font-size:16px;
+    padding-top:14px;
+    flex:0 0 auto;
   }
   .lang-bar{
     display:flex;
@@ -601,26 +695,6 @@
     justify-content:center;
     cursor:pointer;
   }
-  .ad-close-wrap{
-    width:100%;
-    display:flex;
-    justify-content:flex-end;
-    padding:4px 10px;
-    background:var(--surface);
-    border-bottom:1px solid var(--line);
-  }
-  .ad-close-btn{
-    background:transparent;
-    border:none;
-    color:var(--text-dim);
-    font-size:12px;
-    line-height:1;
-    cursor:pointer;
-    padding:4px 8px;
-    display:flex;
-    align-items:center;
-    gap:4px;
-  }
   @keyframes screenFadeIn{
     from{ opacity:0; transform:translateY(10px); }
     to{ opacity:1; transform:translateY(0); }
@@ -689,12 +763,11 @@ const CURRENCY_NAMES = {
   CHF: {de:'Schweizer Franken', tr:'İsviçre Frangı', en:'Swiss Franc', ja:'スイスフラン', zh:'瑞士法郎'},
   CNY: {de:'Chinesischer Yuan', tr:'Çin Yuanı', en:'Chinese Yuan', ja:'中国元', zh:'人民币'},
 };
+
 function ccyName(code){
   const n = CURRENCY_NAMES[code];
   return n ? (n[state.lang] || n.tr) : code;
 }
-
-const RATE_DATE = '2 Temmuz 2026';
 
 function rateDateLabel(){
   const dates = {
@@ -735,7 +808,9 @@ function loadRatesFromCache(){
   try{
     const raw = localStorage.getItem(RATES_CACHE_KEY);
     if(!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if(!parsed || typeof parsed.rates !== 'object' || parsed.rates === null) return null;
+    return parsed;
   }catch(e){
     return null;
   }
@@ -771,6 +846,7 @@ async function fetchLiveRates(){
     }
     console.log('Canli kur alinamadi:', e.message);
   }
+  syncBackgroundRunnerData();
   render();
 }
 
@@ -814,6 +890,84 @@ function convertAmount(amount, fromCode, toCode){
 }
 function crossRate(fromCode, toCode){
   return RATES_TO_EUR[fromCode] / RATES_TO_EUR[toCode];
+}
+
+function sparklineCacheKey(fromCcy, toCcy){
+  return `fiyatla_sparkline_${fromCcy}_${toCcy}`;
+}
+
+async function fetchSparklineHistory(fromCcy, toCcy){
+  if(!fromCcy || !toCcy || fromCcy === toCcy) return null;
+
+  const cacheKey = sparklineCacheKey(fromCcy, toCcy);
+  try{
+    const raw = localStorage.getItem(cacheKey);
+    if(raw){
+      const cached = JSON.parse(raw);
+      const sameDay = cached && cached.timestamp && new Date(cached.timestamp).toDateString() === new Date().toDateString();
+      if(sameDay && Array.isArray(cached.values) && cached.values.length >= 2){
+        return cached.values;
+      }
+    }
+  }catch(e){}
+
+  try{
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 7);
+    const fmt = d => d.toISOString().slice(0,10);
+    const res = await fetch(`https://api.frankfurter.dev/v1/${fmt(start)}..${fmt(end)}?from=${fromCcy}&to=${toCcy}`);
+    if(!res.ok) throw new Error('API hatasi');
+    const data = await res.json();
+    const dateKeys = Object.keys(data.rates || {}).sort();
+    const values = dateKeys.map(d => data.rates[d][toCcy]).filter(v => typeof v === 'number' && v > 0);
+    if(values.length < 2) return null;
+    try{
+      localStorage.setItem(cacheKey, JSON.stringify({ values, timestamp: new Date().toISOString() }));
+    }catch(e){}
+    return values;
+  }catch(e){
+    console.log('Kur gecmisi (sparkline) alinamadi:', e.message);
+    return null;
+  }
+}
+
+function buildSparklineHtml(values, fromCcy, toCcy){
+  if(!Array.isArray(values) || values.length < 2) return '';
+  const w = 100, h = 28, padX = 3, padY = 3;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = (max - min) || (Math.abs(min) * 0.0001) || 1;
+  const stepX = (w - padX * 2) / (values.length - 1);
+  const points = values.map((v, i) => ({
+    x: padX + i * stepX,
+    y: padY + (h - padY * 2) * (1 - (v - min) / range),
+    v,
+  }));
+  const path = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(2) + ',' + p.y.toFixed(2)).join(' ');
+  const trendUp = values[values.length - 1] >= values[0];
+  const pctChange = values[0] !== 0 ? Math.abs((values[values.length - 1] - values[0]) / values[0] * 100) : 0;
+  const pctLabel = pctChange.toFixed(1);
+  const ariaLabel = td('sparklineAria', fromCcy, toCcy, pctLabel, trendUp);
+  const dots = points.map(p => `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.6" fill="var(--teal)"><title>1 ${fromCcy} = ${p.v.toFixed(4)} ${toCcy}</title></circle>`).join('');
+  return `
+    <div class="sparkline-wrap">
+      <span class="sparkline-label">${t('sparklineLabel')}</span>
+      <svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
+        <path d="${path}" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${dots}
+      </svg>
+      <span class="sparkline-delta ${trendUp ? 'sparkline-delta-up' : 'sparkline-delta-down'}">${trendUp ? '▲' : '▼'} ${pctLabel}%</span>
+    </div>
+  `;
+}
+
+async function renderSparklineArea(fromCcy, toCcy){
+  const values = await fetchSparklineHistory(fromCcy, toCcy);
+  if(!values) return;
+  const area = document.getElementById('sparkline-area');
+  if(!area) return;
+  area.innerHTML = buildSparklineHtml(values, fromCcy, toCcy);
 }
 
 const LANG_TO_CCY = { tr:'TRY', en:'USD', ja:'JPY', zh:'CNY', de:'EUR' };
@@ -870,6 +1024,7 @@ const TRANSLATIONS = {
   productNameLabel: {de:'Produktname', tr:'Ürün adı', en:'Product name', ja:'商品名', zh:'商品名称'},
   enterBarcodeMsg: {de:'Bitte gib einen Barcode ein.', tr:'Bir barkod numarası gir.', en:'Enter a barcode number.', ja:'バーコード番号を入力してください。', zh:'请输入条码号。'},
   searchingProduct: {de:'Produkt wird gesucht...', tr:'Ürün aranıyor...', en:'Searching product...', ja:'商品を検索中...', zh:'正在搜索商品...'},
+  comparingPrices: {de:'Preise werden verglichen...', tr:'Fiyatlar karşılaştırılıyor...', en:'Comparing prices...', ja:'価格を比較中...', zh:'正在比较价格...'},
   barcodeNotFoundMsg: {de:'Produkt nicht gefunden.', tr:'Bu barkod veritabanında bulunamadı. Ürün adını biliyorsan "Ürün Adı" sekmesinden aramayı dene.', en:'This barcode was not found. If you know the product name, try the "Product Name" tab.', ja:'このバーコードは見つかりませんでした。商品名がわかる場合は「商品名」タブでお試しください。', zh:'未找到此条码。如果您知道商品名称,请尝试"商品名称"标签。'},
   enterProductNameMsg: {de:'Bitte gib einen Produktnamen ein.', tr:'Bir ürün adı gir.', en:'Enter a product name.', ja:'商品名を入力してください。', zh:'请输入商品名称。'},
   searchingText: {de:'Wird gesucht...', tr:'Aranıyor...', en:'Searching...', ja:'検索中...', zh:'搜索中...'},
@@ -884,6 +1039,10 @@ const TRANSLATIONS = {
   compareStoreCountry: {de:'Geschaeft / Land', tr:'Mağaza / Ülke', en:'Store / Country', ja:'店舗・国', zh:'商店/国家'},
   comparePrice: {de:'Preis', tr:'Fiyat', en:'Price', ja:'価格', zh:'价格'},
   compareNote1: {de:'Diese Vergleichstabelle nutzt Beispiel-(simulierte) Daten. Fuer echte Preise muessten offizielle Store-APIs angebunden werden.', tr:'Not: Bu karşılaştırma tablosu örnek (simüle) verilerle çalışıyor. Gerçek fiyatlar için resmi mağaza API\'lerinin bağlanması gerekiyor.', en:'Note: This comparison table uses sample (simulated) data. Real prices require connecting official store APIs.', ja:'注: この比較表はサンプル(シミュレーション)データを使用しています。実際の価格には公式店舗APIの連携が必要です。', zh:'注:此比较表使用示例(模拟)数据。真实价格需要连接官方商店API。'},
+  realDataBadge: {de:'✅ Echte Haendlerdaten (ueber UPCitemdb)', tr:'✅ Gerçek satıcı verisi (UPCitemDB üzerinden)', en:'✅ Real merchant data (via UPCitemdb)', ja:'✅ 実際の販売者データ(UPCitemdb経由)', zh:'✅ 真实商家数据(通过UPCitemdb)'},
+  fakeDataBadge: {de:'🧪 BEISPIELDATEN — kein echter Preis gefunden', tr:'🧪 ÖRNEK VERİ — gerçek fiyat bulunamadı', en:'🧪 SAMPLE DATA — no real price found', ja:'🧪 サンプルデータ — 実際の価格は見つかりませんでした', zh:'🧪 示例数据——未找到真实价格'},
+  trackingRealPriceActive: {de:'✅ Echte Preisverfolgung aktiv', tr:'✅ Gerçek fiyat takibi aktif', en:'✅ Real price tracking active', ja:'✅ 実際の価格追跡が有効', zh:'✅ 真实价格追踪已启用'},
+  trackingReminderOnly: {de:'⏰ Nur Erinnerung, keine automatischen Preisdaten', tr:'⏰ Sadece hatırlatma, otomatik fiyat verisi yok', en:'⏰ Reminder only, no automatic price data', ja:'⏰ リマインダーのみ、自動価格データなし', zh:'⏰ 仅提醒,无自动价格数据'},
   compareNote2: {de:'Preise koennen je nach Geschaeft variieren.', tr:'"Git" linkleri affiliate/ortaklık bağlantılarıdır — bir mağazadan alışveriş yaparsan küçük bir komisyon kazanabiliriz, senin ödediğin fiyatı değiştirmez.', en:'"Go" links are affiliate links — if you shop through a store we may earn a small commission, at no extra cost to you.', ja:'「移動」リンクはアフィリエイトリンクです。購入すると少額の手数料を得ることがありますが、あなたの支払額は変わりません。', zh:'"前往"链接为联盟链接——如果您通过商店购物,我们可能获得少量佣金,不会增加您的费用。'},
   goBtn: {de:'Los', tr:'Git', en:'Go', ja:'移動', zh:'前往'},
   galleryBtn: {de:'Aus Galerie waehlen', tr:'Galeriden Seç', en:'Choose from Gallery', ja:'ギャラリーから選択', zh:'从相册选择'},
@@ -892,7 +1051,8 @@ const TRANSLATIONS = {
   searchingWiderDb: {de:'Suche in weiteren Produktkategorien...', tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
   invalidBarcodeChecksum: {de:'Diese Barcode-Nummer scheint ungueltig zu sein.', tr:'Bu barkod numarası geçersiz görünüyor (kontrol basamağı tutmuyor). Numarayı kontrol et.', en:'This barcode number appears invalid (checksum mismatch). Please check the number.', ja:'このバーコード番号は無効のようです(チェックデジットが一致しません)。番号を確認してください。', zh:'此条码号似乎无效(校验位不匹配)。请检查号码。'},
   editBtn: {de:'Bearbeiten', tr:'Düzenle', en:'Edit', ja:'編集', zh:'编辑'},
-  experimentalTag: {de:'Beta', tr:'Beta', en:'Beta', ja:'Beta', zh:'Beta'},
+  checkNowBtn: {de:'🔄 Jetzt pruefen', tr:'🔄 Şimdi Kontrol Et', en:'🔄 Check Now', ja:'🔄 今すぐ確認', zh:'🔄 立即检查'},
+  checkingPriceNow: {de:'Preis wird geprueft...', tr:'Fiyat kontrol ediliyor...', en:'Checking price...', ja:'価格を確認中...', zh:'正在检查价格...'},
   sourceOff: {de:'Quelle: Open Food Facts', tr:'Kaynak: Open Food Facts', en:'Source: Open Food Facts', ja:'情報源: Open Food Facts', zh:'来源: Open Food Facts'},
   sourceUpc: {de:'Quelle: UPCitemdb (Community-Daten, ungeprueft)', tr:'Kaynak: UPCitemdb (topluluk verisi, doğrulanmamış)', en:'Source: UPCitemdb (community data, unverified)', ja:'情報源: UPCitemdb(コミュニティデータ、未検証)', zh:'来源: UPCitemdb(社区数据,未经验证)'},
   rateTitle: {de:'Gefaellt dir Fiyatla?', tr:'Fiyatla\'yı beğendin mi?', en:'Enjoying Fiyatla?', ja:'Fiyatlaを気に入りましたか?', zh:'喜欢Fiyatla吗?'},
@@ -903,10 +1063,13 @@ const TRANSLATIONS = {
   themeToggleAria: {de:'Design wechseln', tr:'Tema değiştir', en:'Change theme', ja:'テーマを変更', zh:'切换主题'},
   ariaSwap: {de:'Waehrungsrichtung tauschen', tr:'Para birimlerinin yönünü değiştir', en:'Swap currency direction', ja:'通貨の方向を切り替え', zh:'切换货币方向'},
   onboardingTitle: {de:'Willkommen bei Fiyatla', tr:'Fiyatla\'ya hoş geldin', en:'Welcome to Fiyatla', ja:'Fiyatlaへようこそ', zh:'欢迎使用Fiyatla'},
-  onboardingIntro: {de:'Hier sind drei Dinge, die du tun kannst:', tr:'Üç şeyi hızlıca yapabilirsin:', en:'Here are three things you can do:', ja:'できることは主に3つです:', zh:'您可以快速完成三件事:'},
-  onboardingPoint1: {de:'Rechne sofort einen Betrag in jede Waehrung um', tr:'💱 Bir tutarı istediğin para birimine anında çevir', en:'💱 Instantly convert an amount to any currency', ja:'💱 金額を好きな通貨に即座に変換', zh:'💱 立即将金额转换为任意货币'},
-  onboardingPoint2: {de:'Finde ein Produkt durch Scannen eines Barcodes oder Suche nach Namen', tr:'📷 Barkod tarayarak ya da ürün adıyla arayarak ürün bul', en:'📷 Find a product by scanning a barcode or searching by name', ja:'📷 バーコードをスキャンするか商品名で検索して商品を見つける', zh:'📷 通过扫描条码或按名称搜索来查找商品'},
-  onboardingPoint3: {de:'Fuege Produkte zu deiner Watchliste hinzu und erhalte Erinnerungen', tr:'🔔 Beğendiğin ürünleri takip listene ekle, hatırlatma al', en:'🔔 Add products you like to your watchlist and get reminders', ja:'🔔 気に入った商品をウォッチリストに追加してリマインダーを受け取る', zh:'🔔 将您喜欢的商品添加到关注列表并接收提醒'},
+  onboardingIntro: {de:'So funktioniert es in 3 Schritten:', tr:'3 adımda nasıl çalışır:', en:'How it works in 3 steps:', ja:'3ステップの使い方:', zh:'三步即可上手：'},
+  onboardingStep1Title: {de:'Scannen', tr:'Tara', en:'Scan', ja:'スキャン', zh:'扫描'},
+  onboardingStep1Sub: {de:'Barcode scannen oder nach Namen suchen', tr:'Barkodu okut ya da ürün adıyla ara', en:'Scan a barcode or search by name', ja:'バーコードをスキャンするか商品名で検索', zh:'扫描条码或按名称搜索'},
+  onboardingStep2Title: {de:'Verfolgen', tr:'Takip Et', en:'Track', ja:'追跡', zh:'追踪'},
+  onboardingStep2Sub: {de:'Zur Liste hinzufügen und Zielpreis festlegen', tr:'Ürünü listene ekle, hedef fiyat belirle', en:'Add it to your list and set a target price', ja:'リストに追加して目標価格を設定', zh:'添加到列表并设置目标价格'},
+  onboardingStep3Title: {de:'Benachrichtigt werden', tr:'Bildirim Al', en:'Get Notified', ja:'通知を受け取る', zh:'接收通知'},
+  onboardingStep3Sub: {de:'Wir informieren dich, wenn der Preis dein Ziel erreicht', tr:'Fiyat hedefine ulaşınca haber ver', en:'We\'ll let you know when the price hits your target', ja:'価格が目標に達したらお知らせします', zh:'价格达到目标时通知您'},
   onboardingStartBtn: {de:'Los geht\'s', tr:'Başlayalım', en:"Let's go", ja:'始めましょう', zh:'开始使用'},
   updateAvailableMsg: {de:'Eine neue Version ist verfuegbar. Du kannst im Play Store aktualisieren.', tr:'Yeni bir sürüm mevcut. Play Store\'dan güncelleyebilirsin.', en:'A new version is available. You can update from the Play Store.', ja:'新しいバージョンが利用可能です。Playストアから更新できます。', zh:'有新版本可用。您可以从Play商店更新。'},
   updateDismissBtn: {de:'Schliessen', tr:'Kapat', en:'Dismiss', ja:'閉じる', zh:'关闭'},
@@ -915,6 +1078,7 @@ const TRANSLATIONS = {
   notifPermissionDenied: {de:'Benachrichtigungsberechtigung nicht erteilt. Das Produkt wurde zur Watchliste hinzugefuegt, aber du erhaeltst keine Erinnerungen.', tr:'Bildirim izni verilmedi. Ürünü takip listene ekledik ama hatırlatma alamayacaksın.', en:'Notification permission was not granted. The product was added to your watchlist, but you will not receive reminders.', ja:'通知の許可が拒否されました。商品はウォッチリストに追加されましたが、リマインダーは届きません。', zh:'未授予通知权限。商品已添加到您的关注列表,但您将不会收到提醒。'},
   refreshBtn: {de:'Aktualisieren', tr:'Yenile', en:'Refresh', ja:'更新', zh:'刷新'},
   exportBtn: {de:'Sichern', tr:'Yedekle', en:'Backup', ja:'バックアップ', zh:'备份'},
+  exportFileBtn: {de:'Als Datei teilen', tr:'Dosya Olarak Paylaş', en:'Share as File', ja:'ファイルとして共有', zh:'另存为文件分享'},
   importBtn: {de:'Wiederherstellen', tr:'Geri Yükle', en:'Restore', ja:'復元', zh:'恢复'},
   exportSuccess: {de:'Sicherung in die Zwischenablage kopiert.', tr:'Yedek panoya kopyalandı. İstediğin bir yere (not, e-posta) kaydedebilirsin.', en:'Backup copied to clipboard. You can save it anywhere (notes, email).', ja:'バックアップがクリップボードにコピーされました。', zh:'备份已复制到剪贴板。'},
   importPrompt: {de:'Fuege deinen Sicherungstext hier ein:', tr:'Yedek metnini buraya yapıştır:', en:'Paste your backup text here:', ja:'バックアップテキストをここに貼り付けてください:', zh:'请在此粘贴备份文本:'},
@@ -931,21 +1095,22 @@ const TRANSLATIONS = {
   shareBtn: {de:'Teilen', tr:'Paylaş', en:'Share', ja:'共有', zh:'分享'},
   termsLink: {de:'Nutzungsbedingungen ansehen', tr:'Kullanım Şartlarını Görüntüle', en:'View Terms of Service', ja:'利用規約を見る', zh:'查看服务条款'},
   feedbackBtn: {de:'Feedback senden', tr:'💬 Öneri / Hata Bildir', en:'💬 Send Feedback', ja:'💬 フィードバックを送る', zh:'💬 发送反馈'},
+  reportProblemBtn: {de:'Problem melden', tr:'🐞 Sorun Bildir', en:'🐞 Report a Problem', ja:'🐞 問題を報告', zh:'🐞 报告问题'},
+  reportProblemSuccess: {de:'Danke, das Problem wurde gemeldet.', tr:'Teşekkürler, sorun bildirildi.', en:'Thanks, the problem has been reported.', ja:'ご報告ありがとうございます。問題が報告されました。', zh:'谢谢,问题已报告。'},
+  reportProblemError: {de:'Problem konnte nicht gemeldet werden.', tr:'Sorun bildirilemedi.', en:'Could not report the problem.', ja:'問題を報告できませんでした。', zh:'无法报告问题。'},
   clearDataBtn: {de:'Alle Daten loeschen', tr:'🗑️ Tüm Verileri Temizle', en:'🗑️ Clear All Data', ja:'🗑️ すべてのデータを削除', zh:'🗑️ 清除所有数据'},
   clearDataTitle: {de:'Bist du sicher?', tr:'Emin misin?', en:'Are you sure?', ja:'よろしいですか?', zh:'您确定吗?'},
   clearDataWarning: {de:'Deine Watchliste, dein Suchverlauf und alle Einstellungen werden dauerhaft geloescht. Dies kann nicht rueckgaengig gemacht werden.', tr:'Takip listen, arama geçmişin ve tüm tercihlerin kalıcı olarak silinecek. Bu işlem geri alınamaz.', en:'Your watchlist, search history, and all preferences will be permanently deleted. This cannot be undone.', ja:'ウォッチリスト、検索履歴、すべての設定が完全に削除されます。この操作は元に戻せません。', zh:'您的关注列表、搜索历史和所有偏好设置将被永久删除。此操作无法撤销。'},
   clearDataConfirmBtn: {de:'Ja, loeschen', tr:'Evet, Sil', en:'Yes, Delete', ja:'はい、削除します', zh:'是的,删除'},
   offlineMessage: {de:'Keine Internetverbindung. Manche Funktionen funktionieren moeglicherweise nicht.', tr:'📡 İnternet bağlantın yok. Bazı özellikler çalışmayabilir.', en:'📡 No internet connection. Some features may not work.', ja:'📡 インターネット接続がありません。一部の機能が動作しない場合があります。', zh:'📡 没有网络连接。某些功能可能无法使用。'},
   invalidAmountRange: {de:'Bitte gib einen gueltigen (positiven, angemessenen) Betrag ein.', tr:'Lütfen geçerli (pozitif ve makul büyüklükte) bir tutar gir.', en:'Please enter a valid (positive, reasonable) amount.', ja:'有効な(正の、妥当な範囲の)金額を入力してください。', zh:'请输入有效的(正数且合理范围内的)金额。'},
-  hapticLabel: {de:'Haptisches Feedback', tr:'Dokunma Geri Bildirimi', en:'Haptic Feedback', ja:'触覚フィードバック', zh:'触觉反馈'},
-  stateOn: {de:'An', tr:'Açık', en:'On', ja:'オン', zh:'开'},
-  stateOff: {de:'Aus', tr:'Kapalı', en:'Off', ja:'オフ', zh:'关'},
   egLabel: {tr:'Örn.', en:'E.g.', de:'Z.B.', ja:'例:', zh:'例如:'},
   trackingDisclaimer: {tr:'Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.', en:'Note: Since price data is currently simulated, real-time "price drop" detection is not possible. This reminder sends a "check again" message at regular intervals via your phone\'s notification system.', de:'Hinweis: Da die Preisdaten derzeit simuliert werden, ist eine Echtzeit-Erkennung von Preissenkungen nicht moeglich. Diese Erinnerung sendet in regelmaessigen Abstaenden eine "erneut pruefen"-Nachricht ueber das Benachrichtigungssystem deines Telefons.', ja:'注: 現在価格データはシミュレートされているため、リアルタイムの「値下げ」検出はできません。このリマインダーは、お使いの携帯電話の通知システムを通じて定期的に「再確認」メッセージを送信します。', zh:'注意:由于价格数据目前是模拟的,无法进行实时"降价"检测。此提醒将通过您手机的通知系统定期发送"重新检查"消息。'},
   appErrorMessage: {tr:'Bir şeyler ters gitti.', en:'Something went wrong.', de:'Etwas ist schiefgelaufen.', ja:'問題が発生しました。', zh:'出了点问题。'},
   restartBtn: {tr:'Yeniden Başlat', en:'Restart', de:'Neu starten', ja:'再起動', zh:'重新启动'},
   selectTwoCurrencies: {tr:'Lütfen farklı iki para birimi seç.', en:'Please select two different currencies.', de:'Bitte waehle zwei unterschiedliche Waehrungen.', ja:'2つの異なる通貨を選択してください。', zh:'请选择两种不同的货币。'},
   calculatedWithApp: {tr:'Fiyatla ile hesaplandı', en:'calculated with Fiyatla', de:'berechnet mit Fiyatla', ja:'Fiyatlaで計算', zh:'由Fiyatla计算'},
+  sparklineLabel: {tr:'Son 7 gün', en:'Last 7 days', de:'Letzte 7 Tage', ja:'過去7日間', zh:'最近7天'},
   countryGermany: {tr:'Almanya', en:'Germany', de:'Deutschland', ja:'ドイツ', zh:'德国'},
   countryFrance: {tr:'Fransa', en:'France', de:'Frankreich', ja:'フランス', zh:'法国'},
   countryUK: {tr:'İngiltere', en:'UK', de:'Grossbritannien', ja:'イギリス', zh:'英国'},
@@ -1005,6 +1170,34 @@ const TRANSLATIONS_FN = {
     ja: `${name}の価格を再確認する時間です(目標: €${price})`,
     zh: `该重新检查${name}的价格了(目标: €${price})`,
   }),
+  checkNowTargetReached: (name, price) => ({
+    tr: `✅ ${name}: Hedef fiyata ulaşıldı! Güncel: €${price}`,
+    en: `✅ ${name}: Target price reached! Current: €${price}`,
+    de: `✅ ${name}: Zielpreis erreicht! Aktuell: €${price}`,
+    ja: `✅ ${name}: 目標価格に到達しました!現在: €${price}`,
+    zh: `✅ ${name}: 已达到目标价格!当前: €${price}`,
+  }),
+  checkNowPriceFound: (name, price) => ({
+    tr: `🔍 ${name}: Güncel gerçek fiyat €${price} (hedefe henüz ulaşılmadı)`,
+    en: `🔍 ${name}: Current real price €${price} (target not reached yet)`,
+    de: `🔍 ${name}: Aktueller echter Preis €${price} (Ziel noch nicht erreicht)`,
+    ja: `🔍 ${name}: 現在の実際の価格 €${price}(まだ目標未達)`,
+    zh: `🔍 ${name}: 当前真实价格 €${price}(尚未达到目标)`,
+  }),
+  checkNowNoData: (name) => ({
+    tr: `❓ ${name} için gerçek fiyat verisi bulunamadı`,
+    en: `❓ No real price data found for ${name}`,
+    de: `❓ Keine echten Preisdaten fuer ${name} gefunden`,
+    ja: `❓ ${name}の実際の価格データが見つかりません`,
+    zh: `❓ 未找到${name}的真实价格数据`,
+  }),
+  sparklineAria: (from, to, pct, up) => ({
+    tr: `${from} / ${to} son 7 gün trendi: ${up ? 'yükseldi' : 'düştü'} %${pct}`,
+    en: `${from} / ${to} 7-day trend: ${up ? 'up' : 'down'} ${pct}%`,
+    de: `${from} / ${to} 7-Tage-Trend: ${up ? 'gestiegen' : 'gesunken'} um ${pct}%`,
+    ja: `${from} / ${to} 過去7日間の傾向: ${up ? '上昇' : '下落'} ${pct}%`,
+    zh: `${from} / ${to} 过去7天趋势:${up ? '上涨' : '下跌'}${pct}%`,
+  }),
 };
 
 function td(key, ...args){
@@ -1034,10 +1227,11 @@ function setLanguage(lang){
   state.lang = lang;
   try{ localStorage.setItem('fiyatla_lang', lang); }catch(e){}
   document.documentElement.lang = lang;
+  logAnalyticsEvent('language_changed', { language: lang });
   const defaultCcy = LANG_TO_CCY[lang];
   if(defaultCcy){
     state.fromCcy = defaultCcy;
-    state.toCcy = defaultCcy === 'EUR' ? 'USD' : 'EUR';
+    state.toCcy = defaultCcy === 'USD' ? 'EUR' : 'USD';
   }
   render();
 }
@@ -1062,7 +1256,9 @@ try{ savedLang = localStorage.getItem('fiyatla_lang') || 'tr'; }catch(e){}
 let savedThemeOverride = null;
 try{ savedThemeOverride = localStorage.getItem('fiyatla_theme_override') || null; }catch(e){}
 
-let state = { screen: 'home', stream: null, fromCcy: 'TRY', toCcy: 'EUR', lang: savedLang, themeOverride: savedThemeOverride };
+const initialFromCcy = LANG_TO_CCY[savedLang] || 'TRY';
+const initialToCcy = initialFromCcy === 'USD' ? 'EUR' : 'USD';
+let state = { screen: 'home', stream: null, fromCcy: initialFromCcy, toCcy: initialToCcy, lang: savedLang, themeOverride: savedThemeOverride };
 
 function systemPrefersDark(){
   try{
@@ -1124,23 +1320,6 @@ if(window.matchMedia){
   }catch(e){}
 }
 
-function renderAdCloseButton(){
-  let el = document.getElementById('ad-close-wrap');
-  if(!adsEnabled){
-    if(el) el.remove();
-    return;
-  }
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'ad-close-wrap';
-    el.className = 'ad-close-wrap';
-    document.body.insertBefore(el, document.body.firstChild);
-  }
-  const closeLabels = {de:'Werbung schliessen', tr:'Reklamı kapat', en:'Close ad', ja:'広告を閉じる', zh:'关闭广告'};
-  const label = closeLabels[state.lang] || closeLabels.tr;
-  el.innerHTML = `<button class="ad-close-btn" onclick="toggleAds()">${label} ✕</button>`;
-}
-
 let animateNextRender = false;
 
 function render(){
@@ -1170,7 +1349,13 @@ function render(){
   }
 }
 
+let tickerCache = { html: null, lang: null, ratesKey: null };
+
 function renderTicker(){
+  const ratesKey = JSON.stringify(RATES_TO_EUR);
+  if(tickerCache.html !== null && tickerCache.lang === state.lang && tickerCache.ratesKey === ratesKey){
+    return tickerCache.html;
+  }
   const eurItems = Object.entries(RATES_TO_EUR)
     .filter(([code]) => code !== 'TRY')
     .map(([code, rate]) => `<span>1 ${code} = <b>€${formatNumber(rate, 4)}</b></span>`);
@@ -1181,7 +1366,9 @@ function renderTicker(){
       return `<span>1 ${code} = <b>₺${formatNumber(inTry, 2)}</b></span>`;
     });
   const html = [...eurItems, ...tryItems].join('');
-  return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
+  const result = `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
+  tickerCache = { html: result, lang: state.lang, ratesKey };
+  return result;
 }
 
 function sendFeedback(){
@@ -1190,11 +1377,24 @@ function sendFeedback(){
   window.open('mailto:support.fiyatla@gmail.com?subject=' + subject + '&body=' + body, '_system');
 }
 
+async function reportProblem(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseCrashlytics){
+    showToast(t('reportProblemError'));
+    return;
+  }
+  try{
+    await window.Capacitor.Plugins.FirebaseCrashlytics.recordException({
+      message: `Kullanici sorun bildirdi - ekran: ${state.screen}, dil: ${state.lang}, surum: ${APP_VERSION}`,
+    });
+    await window.Capacitor.Plugins.FirebaseCrashlytics.sendUnsentReports();
+    showToast(t('reportProblemSuccess'));
+  }catch(e){
+    showToast(t('reportProblemError'));
+  }
+}
+
 function confirmClearAllData(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'clear-data-modal-overlay';
-  overlay.innerHTML = `
+  openModal('clear-data-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">⚠️ ${t('clearDataTitle')}</p>
       <p class="modal-sub">${t('clearDataWarning')}</p>
@@ -1203,17 +1403,11 @@ function confirmClearAllData(){
         <button class="modal-btn-primary" style="background:var(--danger); color:#fff;" onclick="executeClearAllData()">${t('clearDataConfirmBtn')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeClearDataModal(){
-  const el = document.getElementById('clear-data-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('clear-data-modal-overlay');
 }
 
 function executeClearAllData(){
@@ -1253,6 +1447,9 @@ function renderSettings(){
       ` : ''}
       <div class="card" style="margin-top:12px;">
         <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="reportProblem()">${t('reportProblemBtn')}</button>
       </div>
       <div class="card card-static" style="margin-top:12px;">
         <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
@@ -1335,7 +1532,7 @@ function renderConvert(){
 
 function renderScan(){
   const mode = state.searchMode || 'barcode';
-  const history = state.searchHistory || [];
+  const history = getSearchHistory();
   return `
     <header class="top">
       <button class="backbtn" onclick="goTo('home')"><span class="back-arrow"></span> ${t('back')}</button>
@@ -1356,7 +1553,7 @@ function renderScan(){
 
       <div class="tabs">
         <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')" role="tab" aria-selected="${mode==='barcode'}">${t('tabBarcode')}</button>
-        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')" role="tab" aria-selected="${mode==='name'}">${t('tabName')} <span style="font-size:9px; opacity:0.65;">(${t('experimentalTag')})</span></button>
+        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')" role="tab" aria-selected="${mode==='name'}">${t('tabName')}</button>
       </div>
 
       <div class="tab-content-anim">
@@ -1382,7 +1579,9 @@ function renderScan(){
         <div class="history-block">
           <label>${t('recentSearches')}</label>
           <div class="history-chips">
-            ${history.map(h => `<button class="chip" onclick="rerunHistory('${h.mode}','${h.value.replace(/'/g,"\\'")}')">${h.value}</button>`).join('')}
+            ${history.map(h => {
+              return `<button class="chip" onclick="rerunHistory('${onclickSafe(h.mode)}','${onclickSafe(h.value)}')">${escapeHtml(h.value)}</button>`;
+            }).join('')}
           </div>
         </div>
       ` : ''}
@@ -1425,15 +1624,16 @@ function attachHandlers(){
 }
 
 function setSearchMode(mode){
+  if(state.searchMode !== mode) stopCamera();
   state.searchMode = mode;
   render();
 }
 
 function addToHistory(mode, value){
-  if(!state.searchHistory) state.searchHistory = [];
-  state.searchHistory = state.searchHistory.filter(h => h.value !== value);
-  state.searchHistory.unshift({mode, value});
-  state.searchHistory = state.searchHistory.slice(0, 6);
+  let history = getSearchHistory().filter(h => h.value !== value);
+  history.unshift({mode, value});
+  history = history.slice(0, 6);
+  saveSearchHistory(history);
 }
 
 function rerunHistory(mode, value){
@@ -1452,6 +1652,7 @@ function goTo(screen){
   stopCamera();
   state.screen = screen;
   animateNextRender = true;
+  logScreenView(screen);
   render();
 }
 
@@ -1486,17 +1687,20 @@ function doConvert(){
   }
   const converted = convertAmount(amount, from, to);
   const rate = crossRate(from, to);
+  logAnalyticsEvent('currency_converted', { from_currency: from, to_currency: to, amount });
   const shareMsg = `${amount} ${from} = ${formatNumber(converted, 2)} ${to} (${t('calculatedWithApp')})`;
   resultBox.innerHTML = `
     <div class="result">
       <div class="big">${formatNumber(converted, 2)} ${to}</div>
       <div class="small">${amount} ${from} · ${t('rateLabel')}: 1 ${from} = ${formatNumber(rate, 4)} ${to}</div>
       <div class="small" style="margin-top:6px;">${rateStatusLabel()}</div>
+      <div id="sparkline-area"></div>
       <button id="convert-share-btn" class="chip" style="margin-top:10px;">📤 ${t('shareBtn')}</button>
     </div>
   `;
   const shareBtn = document.getElementById('convert-share-btn');
   if(shareBtn) shareBtn.onclick = () => shareText(shareMsg);
+  renderSparklineArea(from, to);
 }
 
 // ---- Screen 2: camera + barcode ----
@@ -1578,45 +1782,44 @@ function resetCamBox(){
 }
 
 // ---- Product lookup (Open Food Facts - real API) ----
-function testCrashlytics(){
-  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseCrashlytics){
-    window.Capacitor.Plugins.FirebaseCrashlytics.crash({message: 'Test crash from Fiyatla'});
-  }else{
-    alert('FirebaseCrashlytics eklentisi bulunamadi. Native tarafta kurulu mu kontrol et.');
-  }
-}
-
 function maybeShowOnboarding(openCount){
   if(openCount !== 1) return;
   showOnboardingModal();
 }
 
 function showOnboardingModal(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'onboarding-modal-overlay';
-  overlay.innerHTML = `
+  openModal('onboarding-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">👋 ${t('onboardingTitle')}</p>
       <p class="modal-sub">${t('onboardingIntro')}</p>
-      <p class="modal-sub" style="margin-top:8px;">${t('onboardingPoint1')}</p>
-      <p class="modal-sub" style="margin-top:8px;">${t('onboardingPoint2')}</p>
-      <p class="modal-sub" style="margin-top:8px;">${t('onboardingPoint3')}</p>
+      <div class="onboarding-flow">
+        <div class="onboarding-step">
+          <div class="onboarding-icon">📷</div>
+          <p class="onboarding-step-title">${t('onboardingStep1Title')}</p>
+          <p class="onboarding-step-sub">${t('onboardingStep1Sub')}</p>
+        </div>
+        <div class="onboarding-arrow">→</div>
+        <div class="onboarding-step">
+          <div class="onboarding-icon">🔖</div>
+          <p class="onboarding-step-title">${t('onboardingStep2Title')}</p>
+          <p class="onboarding-step-sub">${t('onboardingStep2Sub')}</p>
+        </div>
+        <div class="onboarding-arrow">→</div>
+        <div class="onboarding-step">
+          <div class="onboarding-icon">🔔</div>
+          <p class="onboarding-step-title">${t('onboardingStep3Title')}</p>
+          <p class="onboarding-step-sub">${t('onboardingStep3Sub')}</p>
+        </div>
+      </div>
       <div class="modal-actions" style="margin-top:16px;">
         <button class="modal-btn-primary" style="width:100%;" onclick="closeOnboardingModal()">${t('onboardingStartBtn')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeOnboardingModal(){
-  const el = document.getElementById('onboarding-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('onboarding-modal-overlay');
 }
 
 const APP_VERSION = '1.0.0';
@@ -1696,10 +1899,7 @@ function maybeShowRatePrompt(openCount){
 }
 
 function showRateModal(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'rate-modal-overlay';
-  overlay.innerHTML = `
+  openModal('rate-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">⭐ ${t('rateTitle')}</p>
       <p class="modal-sub">${t('rateMessage')}</p>
@@ -1709,17 +1909,11 @@ function showRateModal(){
       </div>
       <button class="chip" style="margin-top:12px; width:100%; text-align:center;" onclick="rateNever()">${t('rateNeverBtn')}</button>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeRateModal(){
-  const el = document.getElementById('rate-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('rate-modal-overlay');
 }
 
 function rateNow(){
@@ -1745,32 +1939,25 @@ function editTrackedItem(id){
   const items = getTrackedItems();
   const item = items.find(i => i.id === id);
   if(!item) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'track-modal-overlay';
-  overlay.innerHTML = `
+  const numericTarget = Number(item.targetPrice);
+  const targetValue = Number.isFinite(numericTarget) ? numericTarget.toFixed(2) : '0.00';
+  openModal('track-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
-      <h3 class="modal-title" id="modal-a11y-title">${item.name}</h3>
+      <h3 class="modal-title" id="modal-a11y-title">${escapeHtml(item.name)}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
-      <input type="number" id="target-price-input" value="${item.targetPrice.toFixed(2)}" step="0.01" inputmode="decimal" />
+      <input type="number" id="target-price-input" value="${targetValue}" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
         <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
-        <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${id}')">${t('trackConfirm')}</button>
+        <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${onclickSafe(item.id)}')">${t('trackConfirm')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 async function confirmEditTrackedItem(id){
-  const input = document.getElementById('target-price-input');
-  const target = parseFloat(input.value.replace(',', '.'));
-  if(isNaN(target) || target <= 0){
-    input.style.borderColor = 'var(--danger)';
-    return;
-  }
+  const target = parseTargetPriceInput();
+  if(target === null) return;
   closeTrackModal();
   const items = getTrackedItems();
   const item = items.find(i => i.id === id);
@@ -1781,36 +1968,29 @@ async function confirmEditTrackedItem(id){
     try{
       await window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: [{ id: item.notifId }] });
     }catch(e){}
+    item.notifId = null;
   }
 
-  const granted = await requestNotificationPermission();
-  if(granted && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
-    const newNotifId = Math.floor(Date.now() % 100000);
-    try{
-      await window.Capacitor.Plugins.LocalNotifications.schedule({
-        notifications: [{
-          id: newNotifId,
-          title: t('notifTitle'),
-          body: td('notifBody', item.name, formatNumber(target, 2)),
-          schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
-        }]
-      });
-      item.notifId = newNotifId;
-    }catch(e){}
-  }
+  item.notifId = await scheduleTrackingNotification(item.name, target, { existingItems: items });
   saveTrackedItems(items);
   render();
 }
 
-async function exportBackup(){
+function buildBackupText(){
   const items = getTrackedItems();
+  const history = getSearchHistory();
   const backupObj = {
     app: 'fiyatla',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     tracked: items,
+    searchHistory: history,
   };
-  const text = btoa(unescape(encodeURIComponent(JSON.stringify(backupObj))));
+  return btoa(unescape(encodeURIComponent(JSON.stringify(backupObj))));
+}
+
+async function exportBackup(){
+  const text = buildBackupText();
   try{
     if(navigator.clipboard && navigator.clipboard.writeText){
       await navigator.clipboard.writeText(text);
@@ -1828,11 +2008,35 @@ async function exportBackup(){
   }
 }
 
+async function exportBackupFile(){
+  const text = buildBackupText();
+  const fileName = `fiyatla-yedek-${new Date().toISOString().slice(0,10)}.txt`;
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share){
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+      const writeResult = await Filesystem.writeFile({
+        path: fileName,
+        data: text,
+        directory: 'CACHE',
+        encoding: 'utf8',
+      });
+      await Share.share({
+        title: t('exportFileBtn'),
+        url: writeResult.uri,
+      });
+      showToast(t('exportSuccess'));
+    }else if(navigator.share){
+      await navigator.share({ text: text, title: t('exportFileBtn') });
+    }else{
+      await exportBackup();
+    }
+  }catch(e){
+    console.log('Dosya paylasim hatasi:', e.message);
+  }
+}
+
 function importBackup(){
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'import-modal-overlay';
-  overlay.innerHTML = `
+  openModal('import-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow" id="modal-a11y-title">${t('importBtn')}</p>
       <p class="modal-sub">${t('importPrompt')}</p>
@@ -1842,18 +2046,37 @@ function importBackup(){
         <button class="modal-btn-primary" onclick="confirmImportBackup()">${t('importBtn')}</button>
       </div>
     </div>
-  `;
-  document.body.appendChild(overlay);
-  initModalA11y(overlay);
+  `);
 }
 
 function closeImportModal(){
-  const el = document.getElementById('import-modal-overlay');
-  if(el){
-    if(el._a11yCleanup) el._a11yCleanup();
-    el.remove();
-  }
+  closeModal('import-modal-overlay');
 }
+
+// Yedek metni tamamen disaridan (kullanicidan kullaniciya paylasilan bir
+// metin olarak) geliyor, guvenilir degil. Beklenmeyen alan tipleri
+// (ornegin object/array yerine gecmesi gereken string) hem render
+// asamasinda hem de sonraki islemlerde (formatNumber, notifId iptali vb.)
+// sorun cikarabilecegi icin, kaydetmeden once her ogeyi kendi beklenen
+// tipine zorlayip gecersizse atiyoruz.
+function sanitizeImportedTrackedItem(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id ?? '').slice(0, 200);
+  const name = String(raw.name ?? '').slice(0, 300);
+  if(!id || !name) return null;
+  const targetPrice = Number(raw.targetPrice);
+  return {
+    id,
+    name,
+    brand: String(raw.brand ?? '').slice(0, 300),
+    code: String(raw.code ?? '').slice(0, 50),
+    targetPrice: Number.isFinite(targetPrice) ? targetPrice : 0,
+    notifId: Number.isInteger(raw.notifId) ? raw.notifId : null,
+    hasRealPriceData: raw.hasRealPriceData === true,
+  };
+}
+
+const IMPORT_MAX_ITEMS = 500;
 
 function confirmImportBackup(){
   const input = document.getElementById('import-text-input');
@@ -1864,7 +2087,16 @@ function confirmImportBackup(){
     if(!data || data.app !== 'fiyatla' || !Array.isArray(data.tracked)){
       throw new Error('gecersiz');
     }
-    saveTrackedItems(data.tracked);
+    const sanitizedTracked = data.tracked
+      .slice(0, IMPORT_MAX_ITEMS)
+      .map(sanitizeImportedTrackedItem)
+      .filter(item => item !== null);
+    const sanitizedHistory = (Array.isArray(data.searchHistory) ? data.searchHistory : [])
+      .slice(0, IMPORT_MAX_ITEMS)
+      .filter(h => h && typeof h.value === 'string' && typeof h.mode === 'string')
+      .map(h => ({ mode: h.mode.slice(0, 20), value: h.value.slice(0, 200) }));
+    saveTrackedItems(sanitizedTracked);
+    saveSearchHistory(sanitizedHistory);
     closeImportModal();
     showToast(t('importSuccess'));
     render();
@@ -1914,6 +2146,20 @@ function escapeHtml(str){
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// Bir degeri onclick="fn('${...}')" gibi inline bir olay isleyicisinin
+// tek tirnakli JS string argumanina gommek icin kullanilir. HTML nitelik
+// (attribute) degerleri once tarayici tarafindan entity-decode edilip
+// SONRA JS olarak derlendigi icin, sadece escapeHtml() yeterli degildir:
+// escapeHtml('\'') -> '&#39;' tarayicida tekrar ham '\'' karakterine
+// donusur ve JS string'ini kirar (orn. isminde kesme isareti olan
+// "Kellogg's" gibi urunlerde oldugu gibi). Once JS string kacisi
+// (ters egik cizgi, tek tirnak), sonra HTML nitelik kacisi uygulanir.
+function onclickSafe(str){
+  if(str === null || str === undefined) return '';
+  const jsEscaped = String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return escapeHtml(jsEscaped);
 }
 
 function isValidBarcodeChecksum(code){
@@ -1971,6 +2217,36 @@ function setCachedProduct(code, product){
   }catch(e){}
 }
 
+async function fetchRealOffers(code){
+  if(!code) return null;
+  try{
+    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+    if(!res.ok) return null;
+    const data = await res.json();
+    if(!data.items || data.items.length === 0) return null;
+    const offers = data.items[0].offers || [];
+    return offers.length > 0 ? offers : null;
+  }catch(e){
+    return null;
+  }
+}
+
+function realOffersToEur(offers){
+  const rows = [];
+  for(const offer of offers){
+    if(!offer || typeof offer.price !== 'number' || offer.price <= 0) continue;
+    const currency = (offer.currency || 'USD').toUpperCase();
+    if(!RATES_TO_EUR[currency]) continue;
+    rows.push({
+      merchant: offer.merchant || offer.domain || '—',
+      priceEur: convertAmount(offer.price, currency, 'EUR'),
+      url: offer.link || '#',
+    });
+  }
+  rows.sort((a,b) => a.priceEur - b.priceEur);
+  return rows;
+}
+
 async function tryUpcItemDb(code){
   try{
     const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
@@ -1982,6 +2258,7 @@ async function tryUpcItemDb(code){
       product_name: item.title || item.model || 'Bilinmeyen urun',
       brands: item.brand || '-',
       image_front_small_url: (item.images && item.images[0]) || '',
+      _source: 'upcitemdb',
     };
     renderProductResult(normalized, code);
     return true;
@@ -2029,6 +2306,26 @@ async function lookupBarcode(){
   }
 }
 
+// search.openfoodfacts.org (search-a-licious, beta) does not send permissive
+// CORS headers like the stable world.openfoodfacts.org API does, so a plain
+// WebView fetch() to it fails with "Failed to fetch" before any response is
+// even read. Native platforms aren't subject to browser CORS, so route
+// through Capacitor's built-in native HTTP client there; fall back to fetch()
+// on plain web (e.g. local testing) where CapacitorHttp isn't present.
+async function nativeGet(url){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp){
+    const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url });
+    let data = res.data;
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){}
+    }
+    return { ok: res.status >= 200 && res.status < 300, status: res.status, data };
+  }
+  const res = await fetch(url);
+  const data = await res.json();
+  return { ok: res.ok, status: res.status, data };
+}
+
 // ---- Product search by name (Open Food Facts search API) ----
 async function searchByName(){
   if(!debounceAction('searchByName')) return;
@@ -2041,11 +2338,15 @@ async function searchByName(){
   addToHistory('name', query);
   box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingText')}</div>`;
   try{
-    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=5`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const products = (data.hits || data.products || []).filter(p => p.product_name);
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=5&fields=code,product_name,brands,image_front_small_url`;
+    const { ok, data } = await nativeGet(url);
+    if(!ok) throw new Error('API hatasi');
+    const rawResults = data.hits || data.products || [];
+    const products = rawResults
+      .map(p => ({ ...p, product_name: p.product_name || p.product_name_tr || p.product_name_en || p.generic_name || '' }))
+      .filter(p => p.product_name);
     if(products.length === 0){
+      console.log('Isimle arama: sonuc bulunamadi. Ham yanit ornegi:', JSON.stringify(data).slice(0, 500));
       box.innerHTML = `<div class="error">${td('noResultsFor', query)}</div>`;
       return;
     }
@@ -2053,7 +2354,7 @@ async function searchByName(){
       <div class="result-list">
         ${products.map((p,i) => `
           <button class="result-item" onclick='selectSearchResult(${i})'>
-            ${p.image_front_small_url ? `<img src="${p.image_front_small_url}">` : `<div style="width:44px;height:44px;border-radius:7px;background:var(--surface-2);"></div>`}
+            ${p.image_front_small_url ? `<img src="${escapeHtml(p.image_front_small_url)}">` : `<div style="width:44px;height:44px;border-radius:7px;background:var(--surface-2);"></div>`}
             <div>
               <div class="rname">${escapeHtml(p.product_name)}</div>
               <div class="rbrand">${escapeHtml(p.brands || '-')} - ${escapeHtml(p.code)}</div>
@@ -2064,6 +2365,7 @@ async function searchByName(){
     `;
     state.lastSearchResults = products;
   }catch(err){
+    console.log('Isimle arama hatasi:', err.message);
     box.innerHTML = `<div class="error">${t('nameSearchUnstable')}</div>`;
   }
 }
@@ -2075,16 +2377,18 @@ function selectSearchResult(index){
 
 function renderProductResult(p, code){
   setCachedProduct(code, p);
+  logAnalyticsEvent('product_scan_success', { method: state.searchMode === 'name' ? 'name' : 'barcode', barcode: code });
   const box = document.getElementById('scan-result');
-  const name = escapeHtml(p.product_name || p.generic_name || 'Bilinmeyen ürün');
-  const brand = escapeHtml(p.brands || '—');
+  const rawName = p.product_name || p.generic_name || 'Bilinmeyen ürün';
+  const rawBrand = p.brands || '—';
+  const name = escapeHtml(rawName);
+  const brand = escapeHtml(rawBrand);
   const img = p.image_front_small_url || p.image_url || '';
-  const comparison = buildComparison(name, brand);
-  const safeName = name.replace(/'/g, "\\'");
-  const safeBrand = brand.replace(/'/g, "\\'");
+  const safeName = onclickSafe(rawName);
+  const safeBrand = onclickSafe(rawBrand);
   box.innerHTML = `
     <div class="product-card">
-      ${img ? `<img src="${img}" alt="${name}">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2);"></div>`}
+      ${img ? `<img src="${escapeHtml(img)}" alt="${name}">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2);"></div>`}
       <div style="flex:1;">
         <div class="pname">${name}</div>
         <div class="pbrand">${brand} · barkod ${code}</div>
@@ -2095,11 +2399,16 @@ function renderProductResult(p, code){
       </div>
     </div>
     <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">${t('trackThisProductBtn')}</button>
-    ${comparison}
+    <div id="comparison-area"><div class="result"><span class="spinner"></span>${t('comparingPrices')}</div></div>
   `;
 
   const shareBtn2 = document.getElementById('product-share-btn');
   if(shareBtn2) shareBtn2.onclick = () => shareText(`${name} - ${brand} (Fiyatla ile bulundu)`);
+
+  buildComparison(name, brand, code).then(html => {
+    const area = document.getElementById('comparison-area');
+    if(area) area.innerHTML = html;
+  });
 }
 
 // ---- Fuzzy matching demo ----
@@ -2149,7 +2458,31 @@ function renderAdBanner(){
   `;
 }
 
-function buildComparison(name, brand){
+async function buildComparison(name, brand, code){
+  const realOffers = await fetchRealOffers(code);
+  const realRows = realOffers ? realOffersToEur(realOffers) : [];
+
+  if(realRows.length > 0){
+    const minPrice = realRows[0].priceEur;
+    const rows = realRows.map(r => `
+      <tr>
+        <td class="name-col">${escapeHtml(r.merchant)}</td>
+        <td class="${r.priceEur===minPrice?'cheapest':''}">€ ${formatNumber(r.priceEur, 2)}</td>
+        <td>
+          <a class="go-btn" href="${r.url}" target="_blank" rel="noopener">${t('goBtn')}</a>
+        </td>
+      </tr>
+    `).join('');
+    return `
+      <div class="data-badge data-badge-real">${t('realDataBadge')}</div>
+      <table class="compare">
+        <thead><tr><th>${t('compareStoreCountry')}</th><th>${t('comparePrice')}</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${renderAdBanner()}
+    `;
+  }
+
   const query = `${brand} ${name}`.trim();
   const variants = [
     {country:'🇩🇪 ' + t('countryGermany'), store:'amazon.de', label: `${brand} ${name}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
@@ -2175,6 +2508,7 @@ function buildComparison(name, brand){
     </tr>
   `).join('');
   return `
+    <div class="data-badge data-badge-fake">${t('fakeDataBadge')}</div>
     <table class="compare">
       <thead><tr><th>${t('compareStoreCountry')}</th><th>${t('comparePrice')}</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
@@ -2197,22 +2531,34 @@ function renderTracking(){
       <p class="sub">${t('trackingSub')}</p>
         <div class="row" style="margin-top:10px;">
           <button class="chip" style="flex:1;" onclick="exportBackup()">💾 ${t('exportBtn')}</button>
+          <button class="chip" style="flex:1;" onclick="exportBackupFile()">📤 ${t('exportFileBtn')}</button>
           <button class="chip" style="flex:1;" onclick="importBackup()">📥 ${t('importBtn')}</button>
         </div>
     </header>
     <main>
       ${tracked.length === 0 ? `
         <div class="note">${t('trackEmpty')}</div>
-      ` : tracked.map(item => `
-        <div class="product-card">
-          <div style="flex:1;">
-            <div class="pname">${item.name}</div>
-            <div class="pbrand">${item.brand} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
+      ` : tracked.map(item => {
+        const safeId = onclickSafe(item.id);
+        return `
+        <div class="product-card" style="flex-direction:column; align-items:stretch;">
+          <div>
+            <div class="pname">${escapeHtml(item.name)}</div>
+            <div class="pbrand">${escapeHtml(item.brand)} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
+            <div style="margin-top:4px;">
+              ${item.hasRealPriceData
+                ? `<span class="match-tag match-high">${t('trackingRealPriceActive')}</span>`
+                : `<span class="match-tag match-mid">${t('trackingReminderOnly')}</span>`}
+            </div>
           </div>
-          <button class="go-btn" onclick="editTrackedItem('${item.id}')">${t('editBtn')}</button>
-          <button class="go-btn" onclick="untrackProduct('${item.id}')">${t('dropBtn')}</button>
+          <div class="row" style="margin-top:10px;">
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="checkPriceNow('${safeId}')">${t('checkNowBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="editTrackedItem('${safeId}')">${t('editBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="untrackProduct('${safeId}')">${t('dropBtn')}</button>
+          </div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
       <div class="note">${t('trackingDisclaimer')}</div>
     </main>
     <footer>${t('footerTracking')}</footer>
@@ -2221,16 +2567,67 @@ function renderTracking(){
 
 const TRACKING_KEY = 'fiyatla_tracked_items';
 
-function getTrackedItems(){
+// localStorage'daki bir JSON dizisini guvenle okur. Veri bozuksa (ornegin
+// gelecekte bir format degisikligi ya da beklenmedik bir yazma hatasi
+// yuzunden), sessizce [] donup ustune bos veri yazilmasina izin vermek
+// yerine, once ham veriyi bir "kurtarma" anahtarina yedekler - boylece
+// bir sonraki kaydetme islemi kullanicinin (belki hala kurtarilabilir)
+// verisini kalici olarak silmis olmaz.
+function loadJsonArrayFromStorage(key){
+  const raw = localStorage.getItem(key);
   try{
-    return JSON.parse(localStorage.getItem(TRACKING_KEY) || '[]');
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
   }catch(e){
+    if(raw){
+      try{
+        localStorage.setItem(key + '_corrupted_backup', JSON.stringify({ raw, timestamp: new Date().toISOString() }));
+      }catch(e2){}
+    }
     return [];
   }
 }
 
+function getTrackedItems(){
+  return loadJsonArrayFromStorage(TRACKING_KEY);
+}
+
+function nextNotifId(items){
+  const used = new Set((items || getTrackedItems()).map(i => i.notifId).filter(id => id));
+  let id;
+  do{
+    id = Math.floor(Math.random() * 100000);
+  }while(used.has(id));
+  return id;
+}
+
 function saveTrackedItems(items){
-  localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+  try{
+    localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+  }catch(e){
+    console.log('Takip listesi kaydedilemedi:', e.message);
+  }
+  syncBackgroundRunnerData(items);
+}
+
+function syncBackgroundRunnerData(items){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.BackgroundRunner) return;
+  const minimalItems = (items || getTrackedItems()).map(i => ({ id: i.id, code: i.code, name: i.name, targetPrice: i.targetPrice }));
+  window.Capacitor.Plugins.BackgroundRunner.dispatchEvent({
+    label: 'com.hudayi.fiyatkontrol.pricecheck',
+    event: 'syncData',
+    details: { items: minimalItems, rates: RATES_TO_EUR },
+  }).catch(()=>{});
+}
+
+const SEARCH_HISTORY_KEY = 'fiyatla_search_history';
+
+function getSearchHistory(){
+  return loadJsonArrayFromStorage(SEARCH_HISTORY_KEY);
+}
+
+function saveSearchHistory(history){
+  try{ localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history)); }catch(e){}
 }
 
 async function requestNotificationPermission(){
@@ -2253,17 +2650,20 @@ async function requestNotificationPermission(){
   }
 }
 
-async function trackProduct(name, brand, code, targetPrice){
-  const items = getTrackedItems();
-  const id = `${code}_${Date.now()}`;
-  const notifId = Math.floor(Date.now() % 100000);
-  items.push({ id, name, brand, code, targetPrice, notifId });
-  saveTrackedItems(items);
-
-  const granted = await requestNotificationPermission();
-  if(!granted){
-    return;
+function parseTargetPriceInput(){
+  const input = document.getElementById('target-price-input');
+  const target = parseFloat(input.value.replace(',', '.'));
+  if(isNaN(target) || target <= 0){
+    input.style.borderColor = 'var(--danger)';
+    return null;
   }
+  return target;
+}
+
+async function scheduleTrackingNotification(name, targetPrice, { onError, existingItems } = {}){
+  const granted = await requestNotificationPermission();
+  if(!granted) return null;
+  const notifId = nextNotifId(existingItems);
   try{
     await window.Capacitor.Plugins.LocalNotifications.schedule({
       notifications: [{
@@ -2273,10 +2673,56 @@ async function trackProduct(name, brand, code, targetPrice){
         schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
       }]
     });
-    showToast(td('trackSuccess', name));
+    return notifId;
   }catch(e){
-    showToast(td('trackScheduleError', e.message));
+    if(onError) onError(e);
+    return null;
   }
+}
+
+async function trackProduct(name, brand, code, targetPrice){
+  const items = getTrackedItems();
+  const id = `${code}_${Date.now()}`;
+  const [notifId, realOffers] = await Promise.all([
+    scheduleTrackingNotification(name, targetPrice, {
+      existingItems: items,
+      onError: (e) => showToast(td('trackScheduleError', e.message))
+    }),
+    fetchRealOffers(code),
+  ]);
+
+  items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: !!realOffers });
+  saveTrackedItems(items);
+  logAnalyticsEvent('product_tracked', { barcode: code, target_price: targetPrice });
+  if(notifId){
+    showToast(td('trackSuccess', name));
+  }
+}
+
+async function checkPriceNow(id){
+  const items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+
+  showToast(t('checkingPriceNow'));
+
+  const offers = await fetchRealOffers(item.code);
+  const rows = offers ? realOffersToEur(offers) : [];
+
+  item.hasRealPriceData = rows.length > 0;
+  saveTrackedItems(items);
+
+  if(rows.length === 0){
+    showToast(td('checkNowNoData', item.name));
+  }else{
+    const lowestEur = rows[0].priceEur;
+    if(lowestEur <= item.targetPrice){
+      showToast(td('checkNowTargetReached', item.name, formatNumber(lowestEur, 2)));
+    }else{
+      showToast(td('checkNowPriceFound', item.name, formatNumber(lowestEur, 2)));
+    }
+  }
+  render();
 }
 
 async function untrackProduct(id){
@@ -2291,15 +2737,12 @@ async function untrackProduct(id){
 }
 
 function promptTrackProduct(name, brand, code){
-  const safeName2 = name.replace(/'/g, "\\'");
-  const safeBrand2 = brand.replace(/'/g, "\\'");
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'track-modal-overlay';
-  overlay.innerHTML = `
+  const safeName2 = onclickSafe(name);
+  const safeBrand2 = onclickSafe(brand);
+  openModal('track-modal-overlay', `
     <div class="modal-card">
       <p class="eyebrow">${t('trackModalEyebrow')}</p>
-      <h3 class="modal-title" id="modal-a11y-title">${name}</h3>
+      <h3 class="modal-title" id="modal-a11y-title">${escapeHtml(name)}</h3>
       <p class="modal-sub">${t('trackModalSub')}</p>
       <input type="number" id="target-price-input" value="5.00" step="0.01" inputmode="decimal" />
       <div class="modal-actions">
@@ -2307,9 +2750,26 @@ function promptTrackProduct(name, brand, code){
         <button class="modal-btn-primary" onclick="confirmTrackProduct('${safeName2}','${safeBrand2}','${code}')">${t('trackConfirm')}</button>
       </div>
     </div>
-  `;
+  `);
+}
+
+function openModal(id, innerHtml){
+  closeModal(id);
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = id;
+  overlay.innerHTML = innerHtml;
   document.body.appendChild(overlay);
   initModalA11y(overlay);
+  return overlay;
+}
+
+function closeModal(id){
+  const el = document.getElementById(id);
+  if(el){
+    if(el._a11yCleanup) el._a11yCleanup();
+    el.remove();
+  }
 }
 
 function initModalA11y(overlay){
@@ -2321,7 +2781,7 @@ function initModalA11y(overlay){
   if(focusables.length) focusables[0].focus();
   function trap(e){
     if(e.key === 'Escape'){
-      overlay.querySelector('.modal-btn-secondary, .chip')?.click();
+      overlay.querySelector('.modal-btn-secondary, .chip, .modal-btn-primary')?.click();
     }else if(e.key === 'Tab' && focusables.length){
       const first = focusables[0];
       const last = focusables[focusables.length-1];
@@ -2342,20 +2802,12 @@ function initModalA11y(overlay){
 }
 
 function closeTrackModal(){
-  const overlay = document.getElementById('track-modal-overlay');
-  if(overlay){
-    if(overlay._a11yCleanup) overlay._a11yCleanup();
-    overlay.remove();
-  }
+  closeModal('track-modal-overlay');
 }
 
 function confirmTrackProduct(name, brand, code){
-  const input = document.getElementById('target-price-input');
-  const target = parseFloat(input.value.replace(',', '.'));
-  if(isNaN(target) || target <= 0){
-    input.style.borderColor = 'var(--danger)';
-    return;
-  }
+  const target = parseTargetPriceInput();
+  if(target === null) return;
   closeTrackModal();
   trackProduct(name, brand, code, target);
 }
@@ -2420,6 +2872,23 @@ async function handleConsent(){
   }
 }
 
+async function initAnalytics(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  try{
+    await window.Capacitor.Plugins.FirebaseAnalytics.setEnabled({ enabled: true });
+  }catch(e){}
+}
+
+function logAnalyticsEvent(name, params){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  window.Capacitor.Plugins.FirebaseAnalytics.logEvent({ name, params }).catch(()=>{});
+}
+
+function logScreenView(screenName){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  window.Capacitor.Plugins.FirebaseAnalytics.setCurrentScreen({ screenName }).catch(()=>{});
+}
+
 async function initAdMob(){
   if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob){
     maybeShowOnboarding(window.fiyatlaOpenCount);
@@ -2445,13 +2914,6 @@ async function initAdMob(){
 
 let adsEnabled = true;
 try{ adsEnabled = localStorage.getItem('fiyatla_ads_enabled') !== 'false'; }catch(e){}
-
-function toggleAds(){
-  adsEnabled = !adsEnabled;
-  try{ localStorage.setItem('fiyatla_ads_enabled', adsEnabled ? 'true' : 'false'); }catch(e){}
-  if(adsEnabled) showBannerAd(); else hideBannerAd();
-  render();
-}
 
 function setupAdSizeListener(){
   window.adDebugInfo = 'listener kurulmadi (AdMob yok)';
@@ -2484,13 +2946,6 @@ async function showBannerAd(){
   }catch(e){
     console.log('Banner gosterilemedi:', e.message);
   }
-}
-
-async function hideBannerAd(){
-  if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
-  try{
-    await window.Capacitor.Plugins.AdMob.hideBanner();
-  }catch(e){}
 }
 
 async function handleGalleryImage(event){
@@ -2558,7 +3013,9 @@ window.addEventListener('unhandledrejection', (event) => {
 
 window.__pendingRatePromptCount = null;
 window.fiyatlaOpenCount = getAppOpenCount();
-cleanupExpiredCache();
+setTimeout(cleanupExpiredCache, 0);
+initAnalytics();
+logScreenView(state.screen);
 initAdMob();
 fetchLiveRates();
 setupBackButton();

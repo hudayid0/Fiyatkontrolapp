@@ -1,5 +1,15 @@
 {
   "appId": "com.hudayi.fiyatkontrol",
   "appName": "Fiyatla",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "BackgroundRunner": {
+      "label": "com.hudayi.fiyatkontrol.pricecheck",
+      "src": "runners/pricecheck.js",
+      "event": "checkPrices",
+      "repeat": true,
+      "interval": 1440,
+      "autoStart": true
+    }
+  }
 }

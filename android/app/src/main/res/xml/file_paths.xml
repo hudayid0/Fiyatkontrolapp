@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
+    <!-- external-path kaldirildi: uygulama harici depolamaya hicbir dosya
+         yazmiyor (sadece CACHE dizinini kullaniyor, ornegin
+         exportBackupFile()), bu yuzden en az yetki ilkesi geregi
+         FileProvider'in kapsamini genisletmeye gerek yok. -->
     <cache-path name="my_cache_images" path="." />
 </paths>

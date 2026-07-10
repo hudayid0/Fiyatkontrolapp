@@ -1,0 +1,11 @@
+# Android/Java signing material - never commit real keys
+*.jks
+*.keystore
+*.p12
+keystore-single-line.txt
+keystore-*.txt
+*.pem
+
+# Local env/secrets
+.env
+.env.*
