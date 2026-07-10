@@ -2249,12 +2249,12 @@ function setCachedProduct(code, product){
 const UPCITEMDB_RATE_LIMITED = 'RATE_LIMITED';
 
 // Vercel'e deploy ettikten sonra projenin gercek alan adiyla guncelle
-// (Vercel panelinde "Domains" altinda gorunur - varsayilan olarak
-// <proje-adi>.vercel.app seklindedir).
-const PRICE_LOOKUP_API_URL = 'https://fiyatkontrolapp.vercel.app/api/price-lookup';
+// fiyatla-backend'in Vercel'deki gercek adresi.
+const PRICE_LOOKUP_API_URL = 'https://fiyatla-backend.vercel.app/api/price-lookup';
 // Bu, Anthropic API anahtari DEGIL - sadece bu uc noktayi genel internetten
 // gelen rastgele isteklere karsi hafifce kapatan paylasilan bir sirdir.
-// Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlanir.
+// Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlidir - buraya
+// commit edilmez, elle doldurulur.
 const PRICE_LOOKUP_APP_SECRET = '';
 
 // search.openfoodfacts.org icin kullanilan nativeGet'in POST karsiligi -
