@@ -2567,13 +2567,29 @@ function renderTracking(){
 
 const TRACKING_KEY = 'fiyatla_tracked_items';
 
-function getTrackedItems(){
+// localStorage'daki bir JSON dizisini guvenle okur. Veri bozuksa (ornegin
+// gelecekte bir format degisikligi ya da beklenmedik bir yazma hatasi
+// yuzunden), sessizce [] donup ustune bos veri yazilmasina izin vermek
+// yerine, once ham veriyi bir "kurtarma" anahtarina yedekler - boylece
+// bir sonraki kaydetme islemi kullanicinin (belki hala kurtarilabilir)
+// verisini kalici olarak silmis olmaz.
+function loadJsonArrayFromStorage(key){
+  const raw = localStorage.getItem(key);
   try{
-    const parsed = JSON.parse(localStorage.getItem(TRACKING_KEY) || '[]');
+    const parsed = JSON.parse(raw || '[]');
     return Array.isArray(parsed) ? parsed : [];
   }catch(e){
+    if(raw){
+      try{
+        localStorage.setItem(key + '_corrupted_backup', JSON.stringify({ raw, timestamp: new Date().toISOString() }));
+      }catch(e2){}
+    }
     return [];
   }
+}
+
+function getTrackedItems(){
+  return loadJsonArrayFromStorage(TRACKING_KEY);
 }
 
 function nextNotifId(items){
@@ -2586,7 +2602,11 @@ function nextNotifId(items){
 }
 
 function saveTrackedItems(items){
-  localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+  try{
+    localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+  }catch(e){
+    console.log('Takip listesi kaydedilemedi:', e.message);
+  }
   syncBackgroundRunnerData(items);
 }
 
@@ -2603,12 +2623,7 @@ function syncBackgroundRunnerData(items){
 const SEARCH_HISTORY_KEY = 'fiyatla_search_history';
 
 function getSearchHistory(){
-  try{
-    const parsed = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  }catch(e){
-    return [];
-  }
+  return loadJsonArrayFromStorage(SEARCH_HISTORY_KEY);
 }
 
 function saveSearchHistory(history){
