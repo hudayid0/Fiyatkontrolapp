@@ -34,9 +34,10 @@ module.exports = async function run() {
     assert(t2.stepCount === 3, 'expected 3 onboarding steps, got ' + t2.stepCount);
     assert(t2.arrowCount === 2, 'expected 2 arrows between onboarding steps, got ' + t2.arrowCount);
 
-    // UPCitemDB 429 (daily quota exceeded) must surface a distinct,
-    // actionable message - not the generic "no data found" message.
-    await page.route('**/api.upcitemdb.com/**', (route) => route.fulfill({ status: 429, body: 'Too Many Requests' }));
+    // Price-lookup backend 429 (Anthropic rate limit passed through) must
+    // surface a distinct, actionable message - not the generic "no data
+    // found" message.
+    await page.route('**/api/price-lookup', (route) => route.fulfill({ status: 429, body: JSON.stringify({ error: 'rate_limited' }) }));
     const t3 = await page.evaluate(async () => {
       saveTrackedItems([{ id: 'x1', name: 'Test Product', brand: 'B', code: '123', targetPrice: 5, hasRealPriceData: false }]);
       const toasts = [];
@@ -48,7 +49,7 @@ module.exports = async function run() {
     });
     assert(t3.toasts.some((m) => m.includes('limit')), 'expected a rate-limit-specific toast, got: ' + JSON.stringify(t3.toasts));
     assert(t3.hasRealPriceData === false, 'hasRealPriceData should stay unchanged on rate-limit, got: ' + t3.hasRealPriceData);
-    await page.unroute('**/api.upcitemdb.com/**');
+    await page.unroute('**/api/price-lookup');
 
     assertNoPageErrors(errors);
   } finally {

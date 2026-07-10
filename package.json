@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/hudayid0/Fiyatkontrolapp#readme",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@capacitor-community/admob": "^8.0.0",
     "@capacitor-firebase/analytics": "^8.3.0",
     "@capacitor-firebase/crashlytics": "^8.3.0",

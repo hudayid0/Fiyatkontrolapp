@@ -6,7 +6,7 @@ Fiyatla, kullanıcıların bir tutarı istediği para birimine anında çevirmes
 
 - **Kur çevirici**: Frankfurter API'sinden canlı kurlarla anlık çeviri, son 7 günün mini grafiği (sparkline).
 - **Ürün tarama**: Kamerayla barkod okuma ya da ürün adıyla arama (Open Food Facts + UPCitemDB).
-- **Fiyat takibi**: Hedef fiyat belirleyip ürünleri takip listesine ekleme; günlük arka plan kontrolü (`@capacitor/background-runner`) ve anlık "Şimdi Kontrol Et" butonu ile gerçek fiyat verisi (UPCitemDB) kontrolü.
+- **Fiyat takibi**: Hedef fiyat belirleyip ürünleri takip listesine ekleme; günlük arka plan kontrolü (`@capacitor/background-runner`) ve anlık "Şimdi Kontrol Et" butonu ile gerçek fiyat verisi kontrolü (Claude'un web arama aracını kullanan kendi Vercel/Anthropic backend'imiz üzerinden - bkz. [AI fiyat arama backend'i](#ai-fiyat-arama-backendi)).
 - **Yedekleme**: Takip listesi ve arama geçmişini panoya kopyalayarak ya da dosya olarak paylaşarak yedekleme/geri yükleme.
 - **Bildirimler, reklamlar, analitik**: `@capacitor/local-notifications`, `@capacitor-community/admob`, `@capacitor-firebase/analytics` ve `@capacitor-firebase/crashlytics` entegrasyonu.
 
@@ -21,12 +21,33 @@ Fiyatla, kullanıcıların bir tutarı istediği para birimine anında çevirmes
 ```
 www/index.html          Uygulamanın tamamı (HTML + CSS + JS, tek dosya)
 www/runners/pricecheck.js   Arka plan fiyat kontrolü gorevi (@capacitor/background-runner)
+api/price-lookup.js     Vercel serverless function - Claude web search ile gerçek fiyat arama
 android/                Native Android projesi (Capacitor tarafından yönetilir)
 tests/                  Playwright regresyon testleri (bkz. aşağısı)
 privacy.html, terms.html   Gizlilik politikası / kullanım şartları (Play Store listing için)
 capacitor.config.json    Capacitor yapılandırması (appId, plugin ayarları)
 .github/workflows/build.yml   CI: testler + debug/release APK + AAB derlemesi
 ```
+
+## AI fiyat arama backend'i
+
+Gerçek fiyat verisi UPCitemDB gibi üçüncü taraf bir fiyat API'sinden değil, kendi Vercel üzerinde barındırdığımız bir serverless function'dan (`api/price-lookup.js`) geliyor. Bu fonksiyon, Anthropic'in Claude modelini **kendi web arama (web search) aracıyla** çağırıyor - ürün adı/markasıyla güncel, gerçek satış fiyatı tekliflerini arıyor ve sonucu yapılandırılmış JSON olarak (`output_config.format` ile şemaya zorlanmış) döndürüyor. Başka bir scraping servisi ya da üçüncü taraf fiyat API'si kullanılmıyor.
+
+Uygulama tarafında `www/index.html` içindeki `fetchRealOffers(name, brand, code)`, `PRICE_LOOKUP_API_URL` sabitinde tanımlı bu endpoint'e `{ name, brand, code }` gövdesiyle POST isteği atıyor (native platformda CORS/WebView kısıtlamalarını aşmak için `CapacitorHttp`, düz webde `fetch()` kullanılıyor - bkz. `nativePost`).
+
+### Vercel'de kurulum
+
+1. Vercel panelinde bu repoyu (GitHub bağlantısıyla) bir proje olarak içe aktar - `/api` klasörü otomatik olarak serverless function'lara dönüştürülür, ekstra yapılandırma gerekmez.
+2. Proje ayarlarında **Environment Variables** altında şunları ekle:
+
+   | Ortam değişkeni | Açıklama |
+   |---|---|
+   | `ANTHROPIC_API_KEY` | Anthropic API anahtarı. **Asla repoya commit edilmemeli** - sadece Vercel panelinden elle girilir. |
+   | `APP_SHARED_SECRET` | (Opsiyonel ama önerilir) Herkese açık bu endpoint'in internetteki rastgele isteklerle kötüye kullanılmasını (ve Anthropic faturasının şişmesini) engellemek için hafif bir paylaşılan sır. Ayarlarsan, `www/index.html` içindeki `PRICE_LOOKUP_APP_SECRET` sabitine de aynı değeri yazman gerekir. |
+
+3. Deploy tamamlandıktan sonra Vercel'in verdiği gerçek alan adını (`Domains` sekmesi, varsayılan olarak `<proje-adı>.vercel.app`) `www/index.html` içindeki `PRICE_LOOKUP_API_URL` sabitiyle eşleştiğinden emin ol - farklıysa güncelle.
+
+`ANTHROPIC_API_KEY` client tarafına (Android APK'ya) hiçbir şekilde gömülmez; sadece bu sunucu tarafı fonksiyon içinde `process.env` üzerinden okunur.
 
 ## Geliştirme ortamı kurulumu
 

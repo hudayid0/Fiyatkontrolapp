@@ -9,6 +9,7 @@ module.exports = async function run() {
     await page.exposeFunction('__xssProbe', () => { xssFired = true; });
     await page.route('**/api.upcitemdb.com/**', (route) => route.abort());
     await page.route('**/api.frankfurter.dev/**', (route) => route.abort());
+    await page.route('**/api/price-lookup', (route) => route.abort());
     await page.goto(APP_URL);
 
     // Apostrophe in a scanned product's name/brand must not break the

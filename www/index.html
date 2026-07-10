@@ -2238,21 +2238,55 @@ function setCachedProduct(code, product){
   }catch(e){}
 }
 
-// UPCitemDB'nin ucretsiz "trial" katmani gunde 100 istekle sinirli;
-// limit asildiginda HTTP 429 donuyor. Bunu sessizce "veri yok" ile
+// Gercek fiyat verisi artik UPCitemDB'den degil, Claude'un web arama
+// aracini kullanan kendi Vercel backend'imizden (/api/price-lookup) geliyor.
+// Backend gunluk/dakikalik limit veya Anthropic tarafi 429/529 donerse ayni
+// sekilde HTTP 429 ile cevap verir; bunu sessizce "veri yok" ile
 // karistirmamak icin ozel bir isaretci (sentinel) string donuyoruz -
 // cagiran taraflar bunu Array.isArray() ile ayirt edebilir.
 const UPCITEMDB_RATE_LIMITED = 'RATE_LIMITED';
 
-async function fetchRealOffers(code){
-  if(!code) return null;
+// Vercel'e deploy ettikten sonra projenin gercek alan adiyla guncelle
+// (Vercel panelinde "Domains" altinda gorunur - varsayilan olarak
+// <proje-adi>.vercel.app seklindedir).
+const PRICE_LOOKUP_API_URL = 'https://fiyatkontrolapp.vercel.app/api/price-lookup';
+// Bu, Anthropic API anahtari DEGIL - sadece bu uc noktayi genel internetten
+// gelen rastgele isteklere karsi hafifce kapatan paylasilan bir sirdir.
+// Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlanir.
+const PRICE_LOOKUP_APP_SECRET = '';
+
+// search.openfoodfacts.org icin kullanilan nativeGet'in POST karsiligi -
+// ayni CORS/WebView nedenleriyle native platformda CapacitorHttp uzerinden
+// gonderiyoruz, duz webde fetch()'e dusuyoruz.
+async function nativePost(url, body, headers){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp){
+    const res = await window.Capacitor.Plugins.CapacitorHttp.post({ url, headers, data: body });
+    let data = res.data;
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){}
+    }
+    return { ok: res.status >= 200 && res.status < 300, status: res.status, data };
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function fetchRealOffers(name, brand, code){
+  if(!name) return null;
   try{
-    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+    const res = await nativePost(
+      PRICE_LOOKUP_API_URL,
+      { name, brand, code },
+      PRICE_LOOKUP_APP_SECRET ? { 'X-App-Secret': PRICE_LOOKUP_APP_SECRET } : {},
+    );
     if(res.status === 429) return UPCITEMDB_RATE_LIMITED;
-    if(!res.ok) return null;
-    const data = await res.json();
-    if(!data.items || data.items.length === 0) return null;
-    const offers = data.items[0].offers || [];
+    if(!res.ok || !res.data) return null;
+    const offers = res.data.offers || [];
     return offers.length > 0 ? offers : null;
   }catch(e){
     return null;
@@ -2266,9 +2300,9 @@ function realOffersToEur(offers){
     const currency = (offer.currency || 'USD').toUpperCase();
     if(!RATES_TO_EUR[currency]) continue;
     rows.push({
-      merchant: offer.merchant || offer.domain || '—',
+      merchant: offer.merchant || '—',
       priceEur: convertAmount(offer.price, currency, 'EUR'),
-      url: offer.link || '#',
+      url: offer.url || '#',
     });
   }
   rows.sort((a,b) => a.priceEur - b.priceEur);
@@ -2487,7 +2521,7 @@ function renderAdBanner(){
 }
 
 async function buildComparison(name, brand, code){
-  const realOffers = await fetchRealOffers(code);
+  const realOffers = await fetchRealOffers(name, brand, code);
   const realRows = Array.isArray(realOffers) ? realOffersToEur(realOffers) : [];
 
   if(realRows.length > 0){
@@ -2716,7 +2750,7 @@ async function trackProduct(name, brand, code, targetPrice){
       existingItems: items,
       onError: (e) => showToast(td('trackScheduleError', e.message))
     }),
-    fetchRealOffers(code),
+    fetchRealOffers(name, brand, code),
   ]);
 
   items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: Array.isArray(realOffers) });
@@ -2734,7 +2768,7 @@ async function checkPriceNow(id){
 
   showToast(t('checkingPriceNow'));
 
-  const offers = await fetchRealOffers(item.code);
+  const offers = await fetchRealOffers(item.name, item.brand, item.code);
   if(offers === UPCITEMDB_RATE_LIMITED){
     showToast(td('checkNowRateLimited', item.name));
     return;
