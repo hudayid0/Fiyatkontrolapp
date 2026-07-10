@@ -1053,7 +1053,6 @@ const TRANSLATIONS = {
   editBtn: {de:'Bearbeiten', tr:'Düzenle', en:'Edit', ja:'編集', zh:'编辑'},
   checkNowBtn: {de:'🔄 Jetzt pruefen', tr:'🔄 Şimdi Kontrol Et', en:'🔄 Check Now', ja:'🔄 今すぐ確認', zh:'🔄 立即检查'},
   checkingPriceNow: {de:'Preis wird geprueft...', tr:'Fiyat kontrol ediliyor...', en:'Checking price...', ja:'価格を確認中...', zh:'正在检查价格...'},
-  experimentalTag: {de:'Beta', tr:'Beta', en:'Beta', ja:'Beta', zh:'Beta'},
   sourceOff: {de:'Quelle: Open Food Facts', tr:'Kaynak: Open Food Facts', en:'Source: Open Food Facts', ja:'情報源: Open Food Facts', zh:'来源: Open Food Facts'},
   sourceUpc: {de:'Quelle: UPCitemdb (Community-Daten, ungeprueft)', tr:'Kaynak: UPCitemdb (topluluk verisi, doğrulanmamış)', en:'Source: UPCitemdb (community data, unverified)', ja:'情報源: UPCitemdb(コミュニティデータ、未検証)', zh:'来源: UPCitemdb(社区数据,未经验证)'},
   rateTitle: {de:'Gefaellt dir Fiyatla?', tr:'Fiyatla\'yı beğendin mi?', en:'Enjoying Fiyatla?', ja:'Fiyatlaを気に入りましたか?', zh:'喜欢Fiyatla吗?'},
@@ -1554,7 +1553,7 @@ function renderScan(){
 
       <div class="tabs">
         <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')" role="tab" aria-selected="${mode==='barcode'}">${t('tabBarcode')}</button>
-        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')" role="tab" aria-selected="${mode==='name'}">${t('tabName')} <span style="font-size:9px; opacity:0.65;">(${t('experimentalTag')})</span></button>
+        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')" role="tab" aria-selected="${mode==='name'}">${t('tabName')}</button>
       </div>
 
       <div class="tab-content-anim">
