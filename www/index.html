@@ -2813,9 +2813,14 @@ function confirmTrackProduct(name, brand, code){
 }
 
 // ---- AdMob entegrasyonu ----
-// NOT: Bu asagidaki ID'ler Google'in resmi TEST ID'leridir, gercek para
-// kazandirmaz. Gercek AdMob hesabini actiktan sonra bu ID'leri kendi
-// gercek App ID ve Ad Unit ID'lerinle degistirmen gerekiyor.
+// NOT: Bu ID'ler GERCEK, canli AdMob hesabina ait (App ID kullanici
+// tarafindan dogrulandi - test ID'si DEGIL). Bu yuzden:
+// - initialize() 'initializeForTesting: false' ile cagriliyor (asagida).
+// - Gelistirme/test sirasinda bu reklamlara TIKLAMA - gercek tiklamalar
+//   "gecersiz trafik" sayilip AdMob hesabinin askiya alinmasina yol acabilir.
+// - Yerel/emulator testi icin gecici olarak Google'in resmi test ID'lerini
+//   (App ID: ca-app-pub-3940256099942544~3347511713) kullanmayi tercih
+//   edebilirsin, sonra release'den once gercek ID'lere geri donersin.
 const ADMOB_BANNER_ID = 'ca-app-pub-3346239396398803/8779821335';
 let admobReady = false;
 
