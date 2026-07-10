@@ -760,6 +760,10 @@
 <body>
 <div class="app" id="app"></div>
 
+<!-- Gitignore'da, repoya commit edilmez - bkz. www/local-config.example.js.
+     Dosya yoksa (fresh checkout / CI) tarayici sessizce 404 verir, sayfa
+     calismaya devam eder; PRICE_LOOKUP_APP_SECRET bos string olarak kalir. -->
+<script src="local-config.js"></script>
 <script>
 const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY'];
 
@@ -2248,14 +2252,16 @@ function setCachedProduct(code, product){
 // Array.isArray() ile ayirt edebilir.
 const UPCITEMDB_RATE_LIMITED = 'RATE_LIMITED';
 
-// Vercel'e deploy ettikten sonra projenin gercek alan adiyla guncelle
 // fiyatla-backend'in Vercel'deki gercek adresi.
 const PRICE_LOOKUP_API_URL = 'https://fiyatla-backend.vercel.app/api/price-lookup';
 // Bu, Anthropic API anahtari DEGIL - sadece bu uc noktayi genel internetten
-// gelen rastgele isteklere karsi hafifce kapatan paylasilan bir sirdir.
-// Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlidir - buraya
-// commit edilmez, elle doldurulur.
-const PRICE_LOOKUP_APP_SECRET = '***REDACTED-LEAKED-SECRET***';
+// gelen rastgele isteklere karsi hafifce kapatan paylasilan bir sirdir. Gercek
+// deger Vercel panelinde APP_SHARED_SECRET olarak tanimlidir. Buraya (yani
+// index.html'e, dolayisiyla git'e) hicbir zaman duz metin olarak yazilmaz -
+// www/local-config.js (gitignore'da, repoya commit edilmez) icinde
+// window.FIYATLA_APP_SECRET olarak tanimlanir; ornek icin
+// www/local-config.example.js dosyasina bak.
+const PRICE_LOOKUP_APP_SECRET = (typeof window !== 'undefined' && window.FIYATLA_APP_SECRET) || '';
 
 // search.openfoodfacts.org icin kullanilan nativeGet'in POST karsiligi -
 // ayni CORS/WebView nedenleriyle native platformda CapacitorHttp uzerinden

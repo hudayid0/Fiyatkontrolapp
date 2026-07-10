@@ -34,7 +34,17 @@ Gerçek fiyat verisi UPCitemDB gibi üçüncü taraf bir fiyat API'sinden değil
 
 Uygulama tarafında `www/index.html` içindeki `fetchRealOffers(name, brand, code)`, `PRICE_LOOKUP_API_URL` sabitinde tanımlı backend endpoint'ine `{ name, brand, code }` gövdesiyle POST isteği atıyor (native platformda CORS/WebView kısıtlamalarını aşmak için `CapacitorHttp`, düz webde `fetch()` kullanılıyor - bkz. `nativePost`). Backend'in kendisi (kurulum adımları, ortam değişkenleri, Vercel deploy talimatları dahil) `fiyatla-backend` reposunda belgeleniyor.
 
-`PRICE_LOOKUP_API_URL` backend'in gerçek Vercel alan adıyla, backend'de `APP_SHARED_SECRET` tanımlıysa `PRICE_LOOKUP_APP_SECRET` de aynı değerle güncel tutulmalı. Anthropic API anahtarı bu repoya hiçbir zaman girmez; o sadece `fiyatla-backend`'in kendi sunucu tarafı kodunda `process.env` üzerinden okunur.
+`PRICE_LOOKUP_API_URL` `www/index.html` içinde doğrudan tanımlı (backend'in gerçek Vercel alan adı). `APP_SHARED_SECRET` ise - keystore parolası gibi - **asla bu repoya commit edilmez**: `www/index.html`, sayfa yüklenirken `www/local-config.js` (gitignore'da) içindeki `window.FIYATLA_APP_SECRET` değerini okur.
+
+Yerel kurulum:
+```bash
+cp www/local-config.example.js www/local-config.js
+# www/local-config.js içindeki FIYATLA_APP_SECRET'ı, fiyatla-backend'de
+# Vercel panelinde tanımladığın APP_SHARED_SECRET ile aynı değere ayarla.
+```
+`www/local-config.js` yoksa (fresh checkout, CI) uygulama sorunsuz çalışmaya devam eder, sadece bu secret boş kalır ve backend isteğe `X-App-Secret` header'ı eklenmez. Android derlemesi için bu dosyanın `npx cap sync android` çalıştırılmadan önce `www/` içinde gerçek değerle var olması gerekir (webDir `www` olduğu için build'e otomatik dahil olur).
+
+Anthropic API anahtarı bu repoya hiçbir zaman girmez; o sadece `fiyatla-backend`'in kendi sunucu tarafı kodunda `process.env` üzerinden okunur.
 
 ## Geliştirme ortamı kurulumu
 
