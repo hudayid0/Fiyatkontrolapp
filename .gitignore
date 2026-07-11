@@ -9,3 +9,4 @@ keystore-*.txt
 # Local env/secrets
 .env
 .env.*
+www/local-config.js

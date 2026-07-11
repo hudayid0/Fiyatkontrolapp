@@ -760,6 +760,10 @@
 <body>
 <div class="app" id="app"></div>
 
+<!-- Gitignore'da, repoya commit edilmez - bkz. www/local-config.example.js.
+     Dosya yoksa (fresh checkout / CI) tarayici sessizce 404 verir, sayfa
+     calismaya devam eder; PRICE_LOOKUP_APP_SECRET bos string olarak kalir. -->
+<script src="local-config.js"></script>
 <script>
 const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY'];
 
@@ -2256,7 +2260,6 @@ const PRICE_LOOKUP_API_URL = 'https://fiyatla-backend.vercel.app/api/price-looku
 // Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlidir - buraya
 // commit edilmez, elle doldurulur.
 const PRICE_LOOKUP_APP_SECRET = '';
-
 // search.openfoodfacts.org icin kullanilan nativeGet'in POST karsiligi -
 // ayni CORS/WebView nedenleriyle native platformda CapacitorHttp uzerinden
 // gonderiyoruz, duz webde fetch()'e dusuyoruz.
