@@ -2289,11 +2289,20 @@ async function fetchRealOffers(name, brand, code){
       { name, brand, code },
       PRICE_LOOKUP_APP_SECRET ? { 'X-App-Secret': PRICE_LOOKUP_APP_SECRET } : {},
     );
+    // GECICI TANI: backend'den gerçek veri gelmiyor ama neden bilinmiyor -
+    // ADB/bilgisayar erişimi olmadan cihazda görmek için ham durumu alert
+    // ile göster. Kök neden bulununca bu blok kaldırılacak.
+    if(res.status !== 429 && (!res.ok || !res.data || !(res.data.offers && res.data.offers.length))){
+      try{
+        alert('TANI\nURL: ' + PRICE_LOOKUP_API_URL + '\nstatus: ' + res.status + '\nok: ' + res.ok + '\ndata: ' + JSON.stringify(res.data));
+      }catch(e2){}
+    }
     if(res.status === 429) return UPCITEMDB_RATE_LIMITED;
     if(!res.ok || !res.data) return null;
     const offers = res.data.offers || [];
     return offers.length > 0 ? offers : null;
   }catch(e){
+    try{ alert('TANI: fetchRealOffers exception\n' + (e && e.message ? e.message : String(e))); }catch(e2){}
     return null;
   }
 }
