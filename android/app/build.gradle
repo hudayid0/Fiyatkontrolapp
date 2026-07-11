@@ -27,11 +27,6 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            // Bisection sonucu: minifyEnabled=false ile acilis sorunsuz, true
-            // ile aninda cokuyor - R8 kesin suclu (sinif/metot seviyesinde
-            // keep kurallari, full mode, paketlenmis manifest farki hepsi
-            // ayri ayri denendi/elendi - bkz. MainActivity.java'daki gecici
-            // tani kodu).
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

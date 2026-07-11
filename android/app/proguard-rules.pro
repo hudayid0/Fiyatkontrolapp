@@ -92,10 +92,22 @@
 # TimedNotificationPublisher is looked up by fully qualified class
 # name from AndroidManifest.xml (BroadcastReceiver, same reflection
 # risk as @capacitor/local-notifications' own publisher). The plugin
-# also bundles its own embedded JS engine (android-js-engine-release.aar)
-# for running the background runner script - keep it wholesale.
+# also bundles its own embedded JS engine (android-js-engine-release.aar,
+# native libJSEngine.so/libandroid_js_engine.so) for running the
+# background runner script.
+#
+# ROOT CAUSE of the release-only startup crash: the native engine looks up
+# io.ionic.android_js_engine.NativeWebAPI via JNI FindClass at init time -
+# this is a SIBLING package to io.ionic.backgroundrunner, not covered by
+# the rule below, so R8 stripped it as unreachable (invisible to R8 since
+# it's only referenced from native code, never from Java/Kotlin). The JNI
+# lookup then throws ClassNotFoundException, which the native engine wraps
+# in a C++ std::runtime_error and aborts (SIGABRT) - a native-level crash
+# no JVM try/catch or Thread.UncaughtExceptionHandler can ever intercept,
+# confirmed via a device bugreport tombstone.
 # ============================================================
 -keep class io.ionic.backgroundrunner.** { *; }
+-keep class io.ionic.android_js_engine.** { *; }
 
 # ============================================================
 # @capacitor/filesystem + @capacitor/share
