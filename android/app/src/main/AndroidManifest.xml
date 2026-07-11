@@ -11,6 +11,7 @@
          kendi Yedekle/Geri Yukle ozelligini (exportBackup/importBackup)
          kullaniyor. -->
     <application
+        android:name=".FiyatlaApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
