@@ -79,46 +79,6 @@ jobs:
           cd android
           ./gradlew assembleRelease
 
-      # TEMPORARY diagnostic step - investigating a release-only startup crash.
-      # R8 can't warn about classes only referenced from a JSON asset file
-      # (Capacitor loads its plugin list from assets/capacitor.plugins.json via
-      # Class.forName at runtime, invisible to R8's static reachability
-      # analysis) - so absence from mapping.txt, not a build warning, is the
-      # actual signal that a class was shrunk away as "unreachable".
-      - name: Diagnose ProGuard mapping.txt for critical classes
-        run: |
-          MAP=android/app/build/outputs/mapping/release/mapping.txt
-          if [ ! -f "$MAP" ]; then
-            echo "mapping.txt NOT FOUND at $MAP"
-            find android/app/build/outputs/mapping -type f 2>&1 || echo "(no mapping output directory at all)"
-            exit 0
-          fi
-          echo "mapping.txt found: $(wc -l < "$MAP") lines"
-          echo "--- checking that critical classes survived shrinking (present = kept, missing = stripped) ---"
-          while IFS= read -r cls; do
-            if grep -q "^${cls} ->" "$MAP"; then
-              echo "OK      $cls"
-            else
-              echo "MISSING $cls"
-            fi
-          done <<'CLASSES'
-          com.getcapacitor.Bridge
-          com.getcapacitor.BridgeActivity
-          com.getcapacitor.Plugin
-          com.getcapacitor.community.admob.AdMob
-          io.capawesome.capacitorjs.plugins.firebase.analytics.FirebaseAnalyticsPlugin
-          io.capawesome.capacitorjs.plugins.firebase.crashlytics.FirebaseCrashlyticsPlugin
-          com.capacitorjs.plugins.app.AppPlugin
-          io.ionic.backgroundrunner.plugin.BackgroundRunnerPlugin
-          com.capacitorjs.plugins.filesystem.FilesystemPlugin
-          com.capacitorjs.plugins.localnotifications.LocalNotificationsPlugin
-          com.capacitorjs.plugins.share.SharePlugin
-          com.capacitorjs.plugins.statusbar.StatusBarPlugin
-          com.google.firebase.analytics.FirebaseAnalytics
-          com.google.android.gms.measurement.AppMeasurement
-          com.hudayi.fiyatkontrol.MainActivity
-          CLASSES
-
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:

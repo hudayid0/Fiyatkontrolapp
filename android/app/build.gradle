@@ -27,7 +27,12 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled true
+            // TEMPORARY: minifyEnabled kapatildi - bisection testi icin
+            // (release-only aninda cokme sorunu; mapping.txt kontrolu tum
+            // kritik siniflarin R8 tarafindan silinmedigini gosterdi, yani
+            // bu kapatma R8'i tamamen denklem disi birakmak icin).
+            // Sonuc alinca minifyEnabled true'ya geri donulecek.
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
