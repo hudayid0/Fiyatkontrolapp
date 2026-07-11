@@ -2265,7 +2265,11 @@ const PRICE_LOOKUP_APP_SECRET = (typeof window !== 'undefined' && window.FIYATLA
 // gonderiyoruz, duz webde fetch()'e dusuyoruz.
 async function nativePost(url, body, headers){
   if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp){
-    const res = await window.Capacitor.Plugins.CapacitorHttp.post({ url, headers, data: body });
+    const res = await window.Capacitor.Plugins.CapacitorHttp.post({
+      url,
+      headers: { 'Content-Type': 'application/json', ...headers },
+      data: body,
+    });
     let data = res.data;
     if(typeof data === 'string'){
       try{ data = JSON.parse(data); }catch(e){}
