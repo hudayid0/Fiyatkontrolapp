@@ -78,9 +78,14 @@
 
 # ============================================================
 # @capacitor-firebase/analytics + underlying Firebase Analytics SDK
+# The actual measurement implementation lives under com.google.android.gms.measurement,
+# not just com.google.firebase.analytics - keeping only the latter leaves the former
+# exposed to shrinking/renaming even though it's reached only via reflection internally.
 # ============================================================
 -keep class io.capawesome.capacitorjs.plugins.firebase.analytics.** { *; }
 -keep class com.google.firebase.analytics.** { *; }
+-keep class com.google.android.gms.measurement.** { *; }
+-keep class com.google.android.gms.internal.measurement.** { *; }
 
 # ============================================================
 # @capacitor/background-runner
