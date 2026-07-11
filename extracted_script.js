@@ -1493,7 +1493,7 @@ const PRICE_LOOKUP_API_URL = 'https://fiyatla-backend.vercel.app/api/price-looku
 // gelen rastgele isteklere karsi hafifce kapatan paylasilan bir sirdir.
 // Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlidir - buraya
 // commit edilmez, elle doldurulur.
-const PRICE_LOOKUP_APP_SECRET = 'fba31ff6b042f568877126d27981e951b3f96047c8e7004f';
+const PRICE_LOOKUP_APP_SECRET = '';
 
 // search.openfoodfacts.org icin kullanilan nativeGet'in POST karsiligi -
 // ayni CORS/WebView nedenleriyle native platformda CapacitorHttp uzerinden
