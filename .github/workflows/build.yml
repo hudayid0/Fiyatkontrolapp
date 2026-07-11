@@ -33,6 +33,12 @@ jobs:
       - name: Run test suite
         run: npm test
 
+      - name: Create local-config.js
+        env:
+          FIYATLA_APP_SECRET: ${{ secrets.FIYATLA_APP_SECRET }}
+        run: |
+          echo "window.FIYATLA_APP_SECRET = '${FIYATLA_APP_SECRET}';" > www/local-config.js
+
       - name: Sync Capacitor
         run: npx cap sync android
 

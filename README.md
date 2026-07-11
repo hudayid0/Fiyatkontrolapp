@@ -42,7 +42,9 @@ cp www/local-config.example.js www/local-config.js
 # www/local-config.js içindeki FIYATLA_APP_SECRET'ı, fiyatla-backend'de
 # Vercel panelinde tanımladığın APP_SHARED_SECRET ile aynı değere ayarla.
 ```
-`www/local-config.js` yoksa (fresh checkout, CI) uygulama sorunsuz çalışmaya devam eder, sadece bu secret boş kalır ve backend isteğe `X-App-Secret` header'ı eklenmez. Android derlemesi için bu dosyanın `npx cap sync android` çalıştırılmadan önce `www/` içinde gerçek değerle var olması gerekir (webDir `www` olduğu için build'e otomatik dahil olur).
+`www/local-config.js` yoksa (fresh checkout) uygulama sorunsuz çalışmaya devam eder, sadece bu secret boş kalır ve backend isteğe `X-App-Secret` header'ı eklenmez (backend `APP_SHARED_SECRET` bekliyorsa bu istekler 401 döner). Android derlemesi için bu dosyanın `npx cap sync android` çalıştırılmadan önce `www/` içinde gerçek değerle var olması gerekir (webDir `www` olduğu için build'e otomatik dahil olur).
+
+CI'da bu dosya, `build.yml`'deki "Create local-config.js" adımıyla `FIYATLA_APP_SECRET` adlı GitHub Actions repo secret'ından otomatik oluşturuluyor - repo **Settings → Secrets and variables → Actions**'a, değeri `fiyatla-backend`'deki `APP_SHARED_SECRET` ile birebir aynı olan bir `FIYATLA_APP_SECRET` secret'ı eklenmesi gerekir.
 
 Anthropic API anahtarı bu repoya hiçbir zaman girmez; o sadece `fiyatla-backend`'in kendi sunucu tarafı kodunda `process.env` üzerinden okunur.
 
