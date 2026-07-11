@@ -27,10 +27,13 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            // Bisection sonucu: minifyEnabled=false ile acilis sorunsuz,
-            // true ile aninda cokuyor - R8 kesin suclu. Simdi metot seviyesinde
-            // tani icin tekrar acildi (bkz. asagidaki gecici CI adimi).
-            minifyEnabled true
+            // Bisection sonucu: minifyEnabled=false ile acilis sorunsuz, true
+            // ile aninda cokuyor - R8 kesin suclu (sinif/metot seviyesinde
+            // keep kurallari da ayrica dogrulandi, full mode da denendi).
+            // TEMPORARY: -PforceNoMinify=true ile CI ayni commit'ten hem
+            // minify'li hem minify'siz APK'yi tek run'da uretip paketlenmis
+            // AndroidManifest.xml'i diff'leyebiliyor - ayri commit gerekmeden.
+            minifyEnabled = !project.hasProperty('forceNoMinify')
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
