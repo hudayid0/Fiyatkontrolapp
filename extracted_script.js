@@ -1,0 +1,2409 @@
+
+const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY'];
+
+const CURRENCY_NAMES = {
+  TRY: {de:'Tuerkische Lira', tr:'Türk Lirası', en:'Turkish Lira', ja:'トルコリラ', zh:'土耳其里拉'},
+  USD: {de:'US-Dollar', tr:'ABD Doları', en:'US Dollar', ja:'米ドル', zh:'美元'},
+  GBP: {de:'Britisches Pfund', tr:'İngiliz Sterlini', en:'British Pound', ja:'英ポンド', zh:'英镑'},
+  EUR: {de:'Euro', tr:'Euro', en:'Euro', ja:'ユーロ', zh:'欧元'},
+  JPY: {de:'Japanischer Yen', tr:'Japon Yeni', en:'Japanese Yen', ja:'日本円', zh:'日元'},
+  CHF: {de:'Schweizer Franken', tr:'İsviçre Frangı', en:'Swiss Franc', ja:'スイスフラン', zh:'瑞士法郎'},
+  CNY: {de:'Chinesischer Yuan', tr:'Çin Yuanı', en:'Chinese Yuan', ja:'中国元', zh:'人民币'},
+};
+
+function ccyName(code){
+  const n = CURRENCY_NAMES[code];
+  return n ? (n[state.lang] || n.tr) : code;
+}
+
+function rateDateLabel(){
+  const dates = {
+    tr: '2 Temmuz 2026',
+    en: 'July 2, 2026',
+    de: '2. Juli 2026',
+    ja: '2026年7月2日',
+    zh: '2026年7月2日',
+  };
+  return dates[state.lang] || dates.tr;
+}
+const RATES_TO_EUR = {
+  EUR: 1,
+  USD: 0.8773,
+  GBP: 1.1673,
+  JPY: 0.005403,
+  CHF: 1.0870,
+  TRY: 0.018778,
+  CNY: 0.1288,
+};
+
+let ratesLive = false;
+let ratesFromCache = false;
+let ratesLastUpdated = null;
+
+const RATES_CACHE_KEY = 'fiyatla_last_live_rates';
+
+function saveRatesToCache(){
+  try{
+    localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({
+      rates: RATES_TO_EUR,
+      timestamp: new Date().toISOString(),
+    }));
+  }catch(e){}
+}
+
+function loadRatesFromCache(){
+  try{
+    const raw = localStorage.getItem(RATES_CACHE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || typeof parsed.rates !== 'object' || parsed.rates === null) return null;
+    return parsed;
+  }catch(e){
+    return null;
+  }
+}
+
+async function fetchLiveRates(){
+  try{
+    const res = await fetch('https://api.frankfurter.dev/v1/latest?from=EUR&to=USD,GBP,JPY,CHF,TRY,CNY');
+    if(!res.ok) throw new Error('API hatasi');
+    const data = await res.json();
+    const rates = data.rates;
+    for(const code of Object.keys(rates)){
+      if(rates[code] > 0){
+        RATES_TO_EUR[code] = 1 / rates[code];
+      }
+    }
+    ratesLive = true;
+    ratesFromCache = false;
+    ratesLastUpdated = new Date();
+    saveRatesToCache();
+  }catch(e){
+    ratesLive = false;
+    window.lastRateError = e.message;
+    const cached = loadRatesFromCache();
+    if(cached){
+      for(const code of Object.keys(cached.rates)){
+        RATES_TO_EUR[code] = cached.rates[code];
+      }
+      ratesFromCache = true;
+      ratesLastUpdated = new Date(cached.timestamp);
+    }else{
+      ratesFromCache = false;
+    }
+    console.log('Canli kur alinamadi:', e.message);
+  }
+  syncBackgroundRunnerData();
+  render();
+}
+
+function rateStatusLabel(){
+  if(ratesLive && ratesLastUpdated){
+    const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
+    const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
+    const labels = {de: `Live-Kurs · Stand ${hh}:${mm}`, 
+      tr: `Canlı kur · saat ${hh}:${mm} itibarıyla`,
+      en: `Live rate · as of ${hh}:${mm}`,
+      ja: `ライブレート · ${hh}:${mm}時点`,
+      zh: `实时汇率 · 截至 ${hh}:${mm}`,
+    };
+    return labels[state.lang] || labels.tr;
+  }
+  if(ratesFromCache && ratesLastUpdated){
+    const dd = String(ratesLastUpdated.getDate()).padStart(2,'0');
+    const mo = String(ratesLastUpdated.getMonth()+1).padStart(2,'0');
+    const hh = String(ratesLastUpdated.getHours()).padStart(2,'0');
+    const mm = String(ratesLastUpdated.getMinutes()).padStart(2,'0');
+    const labelsCache = {de: `Offline · letzter Kurs: ${dd}.${mo} ${hh}:${mm}`, 
+      tr: `Bağlantı yok · son kur: ${dd}.${mo} ${hh}:${mm}`,
+      en: `Offline · last rate: ${dd}.${mo} ${hh}:${mm}`,
+      ja: `オフライン · 最終レート: ${dd}.${mo} ${hh}:${mm}`,
+      zh: `离线 · 最后汇率: ${dd}.${mo} ${hh}:${mm}`,
+    };
+    return labelsCache[state.lang] || labelsCache.tr;
+  }
+  const labels2 = {de: `Fester Kurs (offline) · ${rateDateLabel()}`, 
+    tr: `Sabit kur (bağlantı yok) · ${rateDateLabel()}`,
+    en: `Fixed rate (offline) · ${rateDateLabel()}`,
+    ja: `固定レート(オフライン) · ${rateDateLabel()}`,
+    zh: `固定汇率(离线) · ${rateDateLabel()}`,
+  };
+  return labels2[state.lang] || labels2.tr;
+}
+
+function convertAmount(amount, fromCode, toCode){
+  const eurValue = amount * RATES_TO_EUR[fromCode];
+  return eurValue / RATES_TO_EUR[toCode];
+}
+function crossRate(fromCode, toCode){
+  return RATES_TO_EUR[fromCode] / RATES_TO_EUR[toCode];
+}
+
+function sparklineCacheKey(fromCcy, toCcy){
+  return `fiyatla_sparkline_${fromCcy}_${toCcy}`;
+}
+
+async function fetchSparklineHistory(fromCcy, toCcy){
+  if(!fromCcy || !toCcy || fromCcy === toCcy) return null;
+
+  const cacheKey = sparklineCacheKey(fromCcy, toCcy);
+  try{
+    const raw = localStorage.getItem(cacheKey);
+    if(raw){
+      const cached = JSON.parse(raw);
+      const sameDay = cached && cached.timestamp && new Date(cached.timestamp).toDateString() === new Date().toDateString();
+      if(sameDay && Array.isArray(cached.values) && cached.values.length >= 2){
+        return cached.values;
+      }
+    }
+  }catch(e){}
+
+  try{
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 7);
+    const fmt = d => d.toISOString().slice(0,10);
+    const res = await fetch(`https://api.frankfurter.dev/v1/${fmt(start)}..${fmt(end)}?from=${fromCcy}&to=${toCcy}`);
+    if(!res.ok) throw new Error('API hatasi');
+    const data = await res.json();
+    const dateKeys = Object.keys(data.rates || {}).sort();
+    const values = dateKeys.map(d => data.rates[d][toCcy]).filter(v => typeof v === 'number' && v > 0);
+    if(values.length < 2) return null;
+    try{
+      localStorage.setItem(cacheKey, JSON.stringify({ values, timestamp: new Date().toISOString() }));
+    }catch(e){}
+    return values;
+  }catch(e){
+    console.log('Kur gecmisi (sparkline) alinamadi:', e.message);
+    return null;
+  }
+}
+
+function buildSparklineHtml(values, fromCcy, toCcy){
+  if(!Array.isArray(values) || values.length < 2) return '';
+  const w = 100, h = 28, padX = 3, padY = 3;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = (max - min) || (Math.abs(min) * 0.0001) || 1;
+  const stepX = (w - padX * 2) / (values.length - 1);
+  const points = values.map((v, i) => ({
+    x: padX + i * stepX,
+    y: padY + (h - padY * 2) * (1 - (v - min) / range),
+    v,
+  }));
+  const path = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(2) + ',' + p.y.toFixed(2)).join(' ');
+  const trendUp = values[values.length - 1] >= values[0];
+  const pctChange = values[0] !== 0 ? Math.abs((values[values.length - 1] - values[0]) / values[0] * 100) : 0;
+  const pctLabel = pctChange.toFixed(1);
+  const ariaLabel = td('sparklineAria', fromCcy, toCcy, pctLabel, trendUp);
+  const dots = points.map(p => `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.6" fill="var(--teal)"><title>1 ${fromCcy} = ${p.v.toFixed(4)} ${toCcy}</title></circle>`).join('');
+  return `
+    <div class="sparkline-wrap">
+      <span class="sparkline-label">${t('sparklineLabel')}</span>
+      <svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}">
+        <path d="${path}" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${dots}
+      </svg>
+      <span class="sparkline-delta ${trendUp ? 'sparkline-delta-up' : 'sparkline-delta-down'}">${trendUp ? '▲' : '▼'} ${pctLabel}%</span>
+    </div>
+  `;
+}
+
+async function renderSparklineArea(fromCcy, toCcy){
+  const values = await fetchSparklineHistory(fromCcy, toCcy);
+  if(!values) return;
+  const area = document.getElementById('sparkline-area');
+  if(!area) return;
+  area.innerHTML = buildSparklineHtml(values, fromCcy, toCcy);
+}
+
+const LANG_TO_CCY = { tr:'TRY', en:'USD', ja:'JPY', zh:'CNY', de:'EUR' };
+
+const TRANSLATIONS = {
+  eyebrowHome: {de:'Kurs & Preischeck', tr:'Kur & Fiyat Kontrol', en:'Currency & Price Check', ja:'為替・価格チェック', zh:'汇率与价格查询'},
+  homeTitle: {de:'Wie viel kostet es im Ausland?', tr:'Yurtdışında ne kadar tutuyor?', en:'How much is it abroad?', ja:'海外ではいくら?', zh:'国外价格是多少?'},
+  homeSub: {de:'Wandle deinen Preis sofort in jede Waehrung um, oder scanne ein Produkt, um Preise im Ausland zu vergleichen.', tr:'Elindeki fiyatı istediğin para birimine anında çevir, ya da ürünü tarat, yurtdışı fiyatlarla karşılaştır.', en:'Instantly convert your price to any currency, or scan a product to compare foreign prices.', ja:'価格を好きな通貨に即座に変換するか、商品をスキャンして海外価格と比較します。', zh:'立即将价格转换为任意货币,或扫描商品与国外价格比较。'},
+  card1Num: {de:'01 SCHNELLER UMRECHNER', tr:'01 · HIZLI ÇEVİRİCİ', en:'01 · QUICK CONVERTER', ja:'01・クイック変換', zh:'01・快速换算'},
+  card1Title: {de:'Preis eingeben, Kurs sehen', tr:'Fiyat gir, kuru gör', en:'Enter price, see rate', ja:'価格を入力', zh:'输入价格'},
+  card1Desc: {de:'Waehle einen Betrag und zwei Waehrungen, berechne den Gegenwert mit dem aktuellen Kurs.', tr:'Bir tutar ve iki para birimi seç, anlık kur ile karşılığını hesapla.', en:'Choose an amount and two currencies, calculate the live conversion instantly.', ja:'金額と2つの通貨を選択し、即座に換算します。', zh:'选择金额和两种货币,即时计算换算结果。'},
+  card2Num: {de:'02 PRODUKTSCAN', tr:'02 · ÜRÜN TARAMA', en:'02 · PRODUCT SCAN', ja:'02・商品スキャン', zh:'02・商品扫描'},
+  card2Title: {de:'Barcode scannen, vergleichen', tr:'Barkodu tara, karşılaştır', en:'Scan barcode, compare', ja:'バーコードをスキャン', zh:'扫描条码'},
+  card2Desc: {de:'Scanne den Barcode mit der Kamera, erkenne das Produkt und vergleiche es mit Auslandspreisen.', tr:'Kamerayla barkodu oku, ürünü tanı ve yurtdışı fiyatlarıyla karşılaştır.', en:'Read the barcode with your camera and compare foreign prices.', ja:'カメラでバーコードを読み取り、海外価格と比較します。', zh:'用相机扫描条码并与国外价格比较。'},
+  card3Num: {de:'03 MEINE WATCHLISTE', tr:'03 · TAKİP LİSTEM', en:'03 · MY WATCHLIST', ja:'03・ウォッチリスト', zh:'03・我的关注列表'},
+  card3Title: {de:'Preiserinnerungen', tr:'🔔 Fiyat hatırlatıcıları', en:'🔔 Price reminders', ja:'🔔 価格リマインダー', zh:'🔔 价格提醒'},
+  card3Desc: {de:'Erhalte eine taegliche Erinnerung, deine verfolgten Produkte erneut zu pruefen.', tr:"Takip ettiğin ürünler için günlük 'tekrar kontrol et' hatırlatması al.", en:"Get a daily 'check again' reminder for products you track.", ja:'追跡商品について毎日「再確認」リマインダーを受け取ります。', zh:'为您关注的商品每天接收"重新检查"提醒。'},
+  footerHome: {de:'Demo-Prototyp - echte Daten stammen teilweise aus Live-APIs', tr:"demo prototip · gerçek veriler kısmi olarak canlı API'lerden gelir", en:'demo prototype · some data comes from live APIs', ja:'デモ・一部データはライブAPIより', zh:'演示原型・部分数据来自实时API'},
+
+  back: {de:'Zurueck', tr:'Geri', en:'Back', ja:'戻る', zh:'返回'},
+  convertEyebrow: {de:'SCHNELLER UMRECHNER', tr:'01 · Hızlı Çevirici', en:'01 · Quick Converter', ja:'01・クイック変換', zh:'01・快速换算'},
+  convertTitle: {de:'Preis umrechnen', tr:'Fiyat çevir', en:'Convert price', ja:'価格を変換', zh:'转换价格'},
+  amountLabel: {de:'Betrag', tr:'Tutar', en:'Amount', ja:'金額', zh:'金额'},
+  fromLabel: {de:'Von', tr:'Kimden', en:'From', ja:'から', zh:'从'},
+  toLabel: {de:'Zu', tr:'Kime', en:'To', ja:'へ', zh:'到'},
+  convertBtn: {de:'Umrechnen', tr:'Çevir', en:'Convert', ja:'変換', zh:'转换'},
+  footerConvert: {de:'Kurse basieren auf EZB-Referenzdaten', tr:'Kurlar ECB referans verilerine göre sabitlenmiştir', en:'Rates fixed per ECB reference data', ja:'レートはECB基準で固定', zh:'汇率根据欧洲央行参考数据固定'},
+
+  scanEyebrow: {de:'PRODUKTSCAN', tr:'02 · Ürün Tarama', en:'02 · Product Scan', ja:'02・商品スキャン', zh:'02・商品扫描'},
+  scanTitle: {de:'Produkt finden', tr:'Ürünü bul', en:'Find the product', ja:'商品を検索', zh:'查找商品'},
+  scanSub: {de:'Scanne einen Barcode oder suche nach dem Produktnamen.', tr:'Kamera izni ver, barkod numarasını gir ya da ürün adıyla ara.', en:'Grant camera access, enter a barcode, or search by name.', ja:'カメラ許可、バーコード入力、または名前で検索。', zh:'授予相机权限,输入条码,或按名称搜索。'},
+  camOpenBtn: {de:'Kamera oeffnen', tr:'Kamerayı Aç', en:'Open Camera', ja:'カメラを開く', zh:'打开相机'},
+  orManual: {de:'oder manuell eingeben', tr:'veya elle gir', en:'or enter manually', ja:'または手動入力', zh:'或手动输入'},
+  tabBarcode: {de:'Barcode', tr:'Barkod', en:'Barcode', ja:'バーコード', zh:'条码'},
+  tabName: {de:'Produktname', tr:'Ürün Adı', en:'Product Name', ja:'商品名', zh:'商品名称'},
+  findProductBtn: {de:'Produkt finden', tr:'Ürünü Bul', en:'Find Product', ja:'検索', zh:'查找商品'},
+  searchBtn: {de:'Suchen', tr:'Ara', en:'Search', ja:'検索', zh:'搜索'},
+  recentSearches: {de:'Letzte Suchen', tr:'Son aramalar', en:'Recent searches', ja:'最近の検索', zh:'最近搜索'},
+  footerScan: {de:'Produktdaten stammen von Open Food Facts und UPCitemdb', tr:'Ürün verisi: Open Food Facts', en:'Product data: Open Food Facts', ja:'商品データ: Open Food Facts', zh:'商品数据: Open Food Facts'},
+
+  trackingEyebrow: {de:'Preisverfolgung', tr:'03 · Takip Listem', en:'03 · My Watchlist', ja:'03・ウォッチリスト', zh:'03・我的关注列表'},
+  trackingTitle: {de:'Meine Watchliste', tr:'🔔 Fiyat hatırlatıcıları', en:'🔔 Price reminders', ja:'🔔 価格リマインダー', zh:'🔔 价格提醒'},
+  trackingSub: {de:'Regelmaessige Erinnerungsbenachrichtigungen fuer verfolgte Produkte.', tr:'Takip ettiğin ürünler için düzenli aralıklarla hatırlatma bildirimi gönderilir.', en:'You get reminder notifications at regular intervals for tracked products.', ja:'追跡商品について定期的にリマインダー通知が送られます。', zh:'系统会定期为您关注的商品发送提醒通知。'},
+  trackEmpty: {tr:'Henüz takip ettiğin bir ürün yok. Bir ürün aradıktan sonra sonuç ekranındaki "🔔 Bu ürünü takip et" butonuna dokunarak ekleyebilirsin.', en:'No tracked products yet. After finding a product, tap the "🔔 Track this product" button on the results screen to add it.', de:'Du verfolgst noch keine Produkte. Nachdem du ein Produkt gefunden hast, tippe auf der Ergebnisseite auf "🔔 Dieses Produkt verfolgen", um es hinzuzufuegen.', ja:'追跡中の商品はまだありません。商品を検索した後、結果画面の「🔔 この商品を追跡」ボタンをタップして追加できます。', zh:'暂无关注的商品。搜索到商品后,点击结果页面上的"🔔 关注此商品"按钮即可添加。'},
+  dropBtn: {de:'Entfernen', tr:'Bırak', en:'Remove', ja:'削除', zh:'移除'},
+  footerTracking: {de:'Erinnerungen werden lokal auf deinem Geraet geplant', tr:'Bildirimler: Capacitor Local Notifications', en:'Notifications: Capacitor Local Notifications', ja:'通知: Capacitor Local Notifications', zh:'通知: Capacitor Local Notifications'},
+
+  camStartHint: {de:'Tippe, um die Kamera zu starten', tr:'Kamerayı başlatmak için dokun', en:'Tap to start camera', ja:'タップしてカメラを起動', zh:'点击启动相机'},
+  camOpenBtn2: {de:'Kamera oeffnen', tr:'Kamerayı Aç', en:'Open Camera', ja:'カメラを開く', zh:'打开相机'},
+  camCloseBtn: {de:'Kamera schliessen', tr:'Kamerayı Kapat', en:'Close Camera', ja:'カメラを閉じる', zh:'关闭相机'},
+  barcodeLabel: {de:'Barcode-Nummer', tr:'Barkod (EAN/UPC)', en:'Barcode (EAN/UPC)', ja:'バーコード (EAN/UPC)', zh:'条码 (EAN/UPC)'},
+  barcodeHintDefault: {de:'Barcode eingeben oder scannen', tr:'8, 12, 13 ya da 14 haneli bir sayı olmalı.', en:'Must be 8, 12, 13, or 14 digits.', ja:'8、12、13、または14桁である必要があります。', zh:'必须为8、12、13或14位数字。'},
+  barcodeHintValid: {de:'Gueltiges Barcode-Format', tr:'✓ Geçerli format', en:'✓ Valid format', ja:'✓ 有効な形式', zh:'✓ 格式有效'},
+  productNameLabel: {de:'Produktname', tr:'Ürün adı', en:'Product name', ja:'商品名', zh:'商品名称'},
+  enterBarcodeMsg: {de:'Bitte gib einen Barcode ein.', tr:'Bir barkod numarası gir.', en:'Enter a barcode number.', ja:'バーコード番号を入力してください。', zh:'请输入条码号。'},
+  searchingProduct: {de:'Produkt wird gesucht...', tr:'Ürün aranıyor...', en:'Searching product...', ja:'商品を検索中...', zh:'正在搜索商品...'},
+  comparingPrices: {de:'Preise werden verglichen...', tr:'Fiyatlar karşılaştırılıyor...', en:'Comparing prices...', ja:'価格を比較中...', zh:'正在比较价格...'},
+  barcodeNotFoundMsg: {de:'Produkt nicht gefunden.', tr:'Bu barkod veritabanında bulunamadı. Ürün adını biliyorsan "Ürün Adı" sekmesinden aramayı dene.', en:'This barcode was not found. If you know the product name, try the "Product Name" tab.', ja:'このバーコードは見つかりませんでした。商品名がわかる場合は「商品名」タブでお試しください。', zh:'未找到此条码。如果您知道商品名称,请尝试"商品名称"标签。'},
+  enterProductNameMsg: {de:'Bitte gib einen Produktnamen ein.', tr:'Bir ürün adı gir.', en:'Enter a product name.', ja:'商品名を入力してください。', zh:'请输入商品名称。'},
+  searchingText: {de:'Wird gesucht...', tr:'Aranıyor...', en:'Searching...', ja:'検索中...', zh:'搜索中...'},
+  nameSearchUnstable: {de:'Die Namenssuche ist derzeit instabil. Bitte nutze den Barcode.', tr:'Ürün adıyla arama şu an güvenilir çalışmıyor. En sağlam yol: "Barkod" sekmesine geçip kamerayla veya elle barkod ile aramak.', en:'Name search is currently unreliable. Best option: switch to the "Barcode" tab and search by barcode instead.', ja:'名前検索は現在不安定です。「バーコード」タブでの検索をお勧めします。', zh:'名称搜索目前不稳定。建议切换到"条码"标签进行搜索。'},
+  trackModalEyebrow: {de:'Preisverfolgung', tr:'🔔 Fiyat Takibi', en:'🔔 Price Tracking', ja:'🔔 価格追跡', zh:'🔔 价格追踪'},
+  trackModalSub: {de:'Gib deinen Zielpreis ein (Euro) - du bekommst eine Erinnerung, wenn dieser Preis erreicht wird.', tr:'Hedef fiyatını gir (€) — bu fiyata ulaşınca hatırlatma alırsın.', en:'Enter your target price (€) — you will get a reminder when it is reached.', ja:'目標価格を入力してください(€)。到達するとリマインダーが届きます。', zh:'输入目标价格(€)——达到后您将收到提醒。'},
+  trackVazgec: {de:'Abbrechen', tr:'Vazgeç', en:'Cancel', ja:'キャンセル', zh:'取消'},
+  trackConfirm: {de:'Verfolgen', tr:'Takip Et', en:'Track', ja:'追跡する', zh:'追踪'},
+  trackNoPermission: {de:'Benachrichtigungsberechtigung nicht erteilt.', tr:'Ürün takip listesine eklendi. Bildirim izni verilmediği için hatırlatma gönderilemeyecek.', en:'Product added to watchlist. Since notification permission was not granted, reminders cannot be sent.', ja:'商品はウォッチリストに追加されました。通知の許可がないためリマインダーは送信されません。', zh:'商品已加入关注列表。由于未授予通知权限,将无法发送提醒。'},
+  adSponsored: {de:'GESPONSERT', tr:'SPONSORLU', en:'SPONSORED', ja:'スポンサー', zh:'赞助'},
+  adPlaceholderText: {de:'Werbeplatzhalter', tr:'Reklam alanı — gerçek uygulamada AdMob banner burada görünür', en:'Ad space — a real AdMob banner appears here in the real app', ja:'広告スペース — 実際のアプリではここにAdMobバナーが表示されます', zh:'广告位——实际应用中此处会显示AdMob横幅'},
+  compareStoreCountry: {de:'Geschaeft / Land', tr:'Mağaza / Ülke', en:'Store / Country', ja:'店舗・国', zh:'商店/国家'},
+  comparePrice: {de:'Preis', tr:'Fiyat', en:'Price', ja:'価格', zh:'价格'},
+  compareNote1: {de:'Diese Vergleichstabelle nutzt Beispiel-(simulierte) Daten. Fuer echte Preise muessten offizielle Store-APIs angebunden werden.', tr:'Not: Bu karşılaştırma tablosu örnek (simüle) verilerle çalışıyor. Gerçek fiyatlar için resmi mağaza API\'lerinin bağlanması gerekiyor.', en:'Note: This comparison table uses sample (simulated) data. Real prices require connecting official store APIs.', ja:'注: この比較表はサンプル(シミュレーション)データを使用しています。実際の価格には公式店舗APIの連携が必要です。', zh:'注:此比较表使用示例(模拟)数据。真实价格需要连接官方商店API。'},
+  realDataBadge: {de:'✅ Echte Haendlerdaten (ueber UPCitemdb)', tr:'✅ Gerçek satıcı verisi (UPCitemDB üzerinden)', en:'✅ Real merchant data (via UPCitemdb)', ja:'✅ 実際の販売者データ(UPCitemdb経由)', zh:'✅ 真实商家数据(通过UPCitemdb)'},
+  fakeDataBadge: {de:'🧪 BEISPIELDATEN — kein echter Preis gefunden', tr:'🧪 ÖRNEK VERİ — gerçek fiyat bulunamadı', en:'🧪 SAMPLE DATA — no real price found', ja:'🧪 サンプルデータ — 実際の価格は見つかりませんでした', zh:'🧪 示例数据——未找到真实价格'},
+  trackingRealPriceActive: {de:'✅ Echte Preisverfolgung aktiv', tr:'✅ Gerçek fiyat takibi aktif', en:'✅ Real price tracking active', ja:'✅ 実際の価格追跡が有効', zh:'✅ 真实价格追踪已启用'},
+  trackingReminderOnly: {de:'⏰ Nur Erinnerung, keine automatischen Preisdaten', tr:'⏰ Sadece hatırlatma, otomatik fiyat verisi yok', en:'⏰ Reminder only, no automatic price data', ja:'⏰ リマインダーのみ、自動価格データなし', zh:'⏰ 仅提醒,无自动价格数据'},
+  compareNote2: {de:'Preise koennen je nach Geschaeft variieren.', tr:'"Git" linkleri affiliate/ortaklık bağlantılarıdır — bir mağazadan alışveriş yaparsan küçük bir komisyon kazanabiliriz, senin ödediğin fiyatı değiştirmez.', en:'"Go" links are affiliate links — if you shop through a store we may earn a small commission, at no extra cost to you.', ja:'「移動」リンクはアフィリエイトリンクです。購入すると少額の手数料を得ることがありますが、あなたの支払額は変わりません。', zh:'"前往"链接为联盟链接——如果您通过商店购物,我们可能获得少量佣金,不会增加您的费用。'},
+  goBtn: {de:'Los', tr:'Git', en:'Go', ja:'移動', zh:'前往'},
+  galleryBtn: {de:'Aus Galerie waehlen', tr:'Galeriden Seç', en:'Choose from Gallery', ja:'ギャラリーから選択', zh:'从相册选择'},
+  galleryNoBarcode: {de:'Kein Barcode im Bild gefunden. Versuche ein anderes Foto oder gib ihn manuell ein.', tr:'Görselde barkod bulunamadı. Farklı bir fotoğraf dene ya da elle gir.', en:'No barcode found in the image. Try another photo or enter manually.', ja:'画像にバーコードが見つかりませんでした。別の写真を試すか手動で入力してください。', zh:'图片中未找到条码。请尝试其他照片或手动输入。'},
+  galleryUnsupported: {de:'Dieses Geraet unterstuetzt das Scannen von Barcodes aus Bildern nicht.', tr:'Bu cihaz görselden barkod okumayı desteklemiyor.', en:'This device does not support scanning barcodes from images.', ja:'このデバイスは画像からのバーコード読み取りに対応していません。', zh:'此设备不支持从图片扫描条码。'},
+  searchingWiderDb: {de:'Suche in weiteren Produktkategorien...', tr:'Diğer ürün kategorilerinde aranıyor...', en:'Searching other product categories...', ja:'他の商品カテゴリを検索中...', zh:'正在搜索其他商品类别...'},
+  invalidBarcodeChecksum: {de:'Diese Barcode-Nummer scheint ungueltig zu sein.', tr:'Bu barkod numarası geçersiz görünüyor (kontrol basamağı tutmuyor). Numarayı kontrol et.', en:'This barcode number appears invalid (checksum mismatch). Please check the number.', ja:'このバーコード番号は無効のようです(チェックデジットが一致しません)。番号を確認してください。', zh:'此条码号似乎无效(校验位不匹配)。请检查号码。'},
+  editBtn: {de:'Bearbeiten', tr:'Düzenle', en:'Edit', ja:'編集', zh:'编辑'},
+  checkNowBtn: {de:'🔄 Jetzt pruefen', tr:'🔄 Şimdi Kontrol Et', en:'🔄 Check Now', ja:'🔄 今すぐ確認', zh:'🔄 立即检查'},
+  checkingPriceNow: {de:'Preis wird geprueft...', tr:'Fiyat kontrol ediliyor...', en:'Checking price...', ja:'価格を確認中...', zh:'正在检查价格...'},
+  sourceOff: {de:'Quelle: Open Food Facts', tr:'Kaynak: Open Food Facts', en:'Source: Open Food Facts', ja:'情報源: Open Food Facts', zh:'来源: Open Food Facts'},
+  sourceUpc: {de:'Quelle: UPCitemdb (Community-Daten, ungeprueft)', tr:'Kaynak: UPCitemdb (topluluk verisi, doğrulanmamış)', en:'Source: UPCitemdb (community data, unverified)', ja:'情報源: UPCitemdb(コミュニティデータ、未検証)', zh:'来源: UPCitemdb(社区数据,未经验证)'},
+  rateTitle: {de:'Gefaellt dir Fiyatla?', tr:'Fiyatla\'yı beğendin mi?', en:'Enjoying Fiyatla?', ja:'Fiyatlaを気に入りましたか?', zh:'喜欢Fiyatla吗?'},
+  rateMessage: {de:'Wir wuerden uns ueber eine 5-Sterne-Bewertung im Play Store freuen.', tr:'Play Store\'da bize 5 yıldız verirsen çok mutlu oluruz — bu, uygulamanın daha fazla kişiye ulaşmasına yardımcı olur.', en:'We would love a 5-star rating on the Play Store — it helps the app reach more people.', ja:'Playストアで5つ星評価をいただけると嬉しいです。より多くの人に届く助けになります。', zh:'如果您能在Play商店给我们5星评价,我们将非常感激——这有助于让更多人发现这个应用。'},
+  rateNowBtn: {de:'Jetzt bewerten', tr:'Değerlendir', en:'Rate now', ja:'評価する', zh:'立即评价'},
+  rateLaterBtn: {de:'Vielleicht spaeter', tr:'Daha sonra', en:'Maybe later', ja:'後で', zh:'稍后'},
+  rateNeverBtn: {de:'Nicht mehr fragen', tr:'Bir daha sorma', en:"Don't ask again", ja:'今後表示しない', zh:'不再询问'},
+  themeToggleAria: {de:'Design wechseln', tr:'Tema değiştir', en:'Change theme', ja:'テーマを変更', zh:'切换主题'},
+  ariaSwap: {de:'Waehrungsrichtung tauschen', tr:'Para birimlerinin yönünü değiştir', en:'Swap currency direction', ja:'通貨の方向を切り替え', zh:'切换货币方向'},
+  onboardingTitle: {de:'Willkommen bei Fiyatla', tr:'Fiyatla\'ya hoş geldin', en:'Welcome to Fiyatla', ja:'Fiyatlaへようこそ', zh:'欢迎使用Fiyatla'},
+  onboardingIntro: {de:'So funktioniert es in 3 Schritten:', tr:'3 adımda nasıl çalışır:', en:'How it works in 3 steps:', ja:'3ステップの使い方:', zh:'三步即可上手：'},
+  onboardingStep1Title: {de:'Scannen', tr:'Tara', en:'Scan', ja:'スキャン', zh:'扫描'},
+  onboardingStep1Sub: {de:'Barcode scannen oder nach Namen suchen', tr:'Barkodu okut ya da ürün adıyla ara', en:'Scan a barcode or search by name', ja:'バーコードをスキャンするか商品名で検索', zh:'扫描条码或按名称搜索'},
+  onboardingStep2Title: {de:'Verfolgen', tr:'Takip Et', en:'Track', ja:'追跡', zh:'追踪'},
+  onboardingStep2Sub: {de:'Zur Liste hinzufügen und Zielpreis festlegen', tr:'Ürünü listene ekle, hedef fiyat belirle', en:'Add it to your list and set a target price', ja:'リストに追加して目標価格を設定', zh:'添加到列表并设置目标价格'},
+  onboardingStep3Title: {de:'Benachrichtigt werden', tr:'Bildirim Al', en:'Get Notified', ja:'通知を受け取る', zh:'接收通知'},
+  onboardingStep3Sub: {de:'Wir informieren dich, wenn der Preis dein Ziel erreicht', tr:'Fiyat hedefine ulaşınca haber ver', en:'We\'ll let you know when the price hits your target', ja:'価格が目標に達したらお知らせします', zh:'价格达到目标时通知您'},
+  onboardingStartBtn: {de:'Los geht\'s', tr:'Başlayalım', en:"Let's go", ja:'始めましょう', zh:'开始使用'},
+  updateAvailableMsg: {de:'Eine neue Version ist verfuegbar. Du kannst im Play Store aktualisieren.', tr:'Yeni bir sürüm mevcut. Play Store\'dan güncelleyebilirsin.', en:'A new version is available. You can update from the Play Store.', ja:'新しいバージョンが利用可能です。Playストアから更新できます。', zh:'有新版本可用。您可以从Play商店更新。'},
+  updateDismissBtn: {de:'Schliessen', tr:'Kapat', en:'Dismiss', ja:'閉じる', zh:'关闭'},
+  camPermissionDenied: {de:'Kamerazugriff wurde nicht gewaehrt. Aktiviere ihn in den Einstellungen oder gib den Barcode manuell ein.', tr:'Kamera izni verilmedi. Ayarlardan izin verebilir ya da barkodu elle girebilirsin.', en:'Camera permission was not granted. You can enable it in settings, or enter the barcode manually.', ja:'カメラの許可が拒否されました。設定で許可するか、バーコードを手動で入力してください。', zh:'未授予相机权限。您可以在设置中启用,或手动输入条码。'},
+  camGenericError: {de:'Kamera konnte nicht aufgerufen werden. Du kannst den Barcode manuell eingeben.', tr:'Kameraya erişilemedi. Barkodu elle girebilirsin.', en:'Could not access the camera. You can enter the barcode manually.', ja:'カメラにアクセスできませんでした。バーコードを手動で入力できます。', zh:'无法访问相机。您可以手动输入条码。'},
+  notifPermissionDenied: {de:'Benachrichtigungsberechtigung nicht erteilt. Das Produkt wurde zur Watchliste hinzugefuegt, aber du erhaeltst keine Erinnerungen.', tr:'Bildirim izni verilmedi. Ürünü takip listene ekledik ama hatırlatma alamayacaksın.', en:'Notification permission was not granted. The product was added to your watchlist, but you will not receive reminders.', ja:'通知の許可が拒否されました。商品はウォッチリストに追加されましたが、リマインダーは届きません。', zh:'未授予通知权限。商品已添加到您的关注列表,但您将不会收到提醒。'},
+  refreshBtn: {de:'Aktualisieren', tr:'Yenile', en:'Refresh', ja:'更新', zh:'刷新'},
+  exportBtn: {de:'Sichern', tr:'Yedekle', en:'Backup', ja:'バックアップ', zh:'备份'},
+  exportFileBtn: {de:'Als Datei teilen', tr:'Dosya Olarak Paylaş', en:'Share as File', ja:'ファイルとして共有', zh:'另存为文件分享'},
+  importBtn: {de:'Wiederherstellen', tr:'Geri Yükle', en:'Restore', ja:'復元', zh:'恢复'},
+  exportSuccess: {de:'Sicherung in die Zwischenablage kopiert.', tr:'Yedek panoya kopyalandı. İstediğin bir yere (not, e-posta) kaydedebilirsin.', en:'Backup copied to clipboard. You can save it anywhere (notes, email).', ja:'バックアップがクリップボードにコピーされました。', zh:'备份已复制到剪贴板。'},
+  importPrompt: {de:'Fuege deinen Sicherungstext hier ein:', tr:'Yedek metnini buraya yapıştır:', en:'Paste your backup text here:', ja:'バックアップテキストをここに貼り付けてください:', zh:'请在此粘贴备份文本:'},
+  importSuccess: {de:'Wiederherstellung erfolgreich.', tr:'Geri yükleme başarılı.', en:'Restore successful.', ja:'復元に成功しました。', zh:'恢复成功。'},
+  importError: {de:'Ungueltiger Sicherungstext.', tr:'Geçersiz yedek metni.', en:'Invalid backup text.', ja:'無効なバックアップテキストです。', zh:'备份文本无效。'},
+  settingsMenuLabel: {de:'Info', tr:'Bilgi', en:'Info', ja:'情報', zh:'信息'},
+  settingsTitle: {de:'Info', tr:'Bilgi', en:'Info', ja:'情報', zh:'信息'},
+  settingsSub: {de:'Datenschutz und ueber die App.', tr:'Gizlilik ve uygulama hakkında.', en:'Privacy and about the app.', ja:'プライバシーとアプリについて。', zh:'隐私和关于应用。'},
+  privacyPolicyLink: {de:'Datenschutzerklaerung ansehen', tr:'Gizlilik Politikasını Görüntüle', en:'View Privacy Policy', ja:'プライバシーポリシーを見る', zh:'查看隐私政策'},
+  managePrivacyBtn: {de:'Werbeeinstellungen verwalten', tr:'Reklam Tercihlerini Yönet', en:'Manage Ad Preferences', ja:'広告設定を管理', zh:'管理广告偏好'},
+  contactLabel: {de:'Kontakt', tr:'İletişim', en:'Contact', ja:'お問い合わせ', zh:'联系我们'},
+  batteryTipTitle: {de:'Erhaeltst du keine Erinnerungen?', tr:'🔋 Bildirimler gelmiyor mu?', en:'🔋 Not receiving reminders?', ja:'🔋 リマインダーが届きませんか?', zh:'🔋 未收到提醒?'},
+  batteryTipBody: {de:'Auf manchen Telefonen (Xiaomi, Huawei, Samsung usw.) koennen Akkusparfunktionen Erinnerungen blockieren. Nimm Fiyatla in den Akku-Einstellungen von Einschraenkungen aus.', tr:'Bazı telefonlarda (Xiaomi, Huawei, Samsung vb.) pil tasarrufu ayarları hatırlatmaları engelleyebilir. Telefon Ayarları > Pil > Fiyatla\'ya gidip pil kısıtlamasını kaldırmanı öneririz.', en:'On some phones (Xiaomi, Huawei, Samsung, etc.) battery-saving settings may block reminders. We recommend going to Phone Settings > Battery > Fiyatla and removing battery restrictions.', ja:'一部の端末(Xiaomi、Huawei、Samsungなど)ではバッテリー節約設定によりリマインダーがブロックされることがあります。', zh:'在某些手机(小米、华为、三星等)上,省电设置可能会阻止提醒。建议前往手机设置>电池>Fiyatla并解除电池限制。'},
+  shareBtn: {de:'Teilen', tr:'Paylaş', en:'Share', ja:'共有', zh:'分享'},
+  termsLink: {de:'Nutzungsbedingungen ansehen', tr:'Kullanım Şartlarını Görüntüle', en:'View Terms of Service', ja:'利用規約を見る', zh:'查看服务条款'},
+  feedbackBtn: {de:'Feedback senden', tr:'💬 Öneri / Hata Bildir', en:'💬 Send Feedback', ja:'💬 フィードバックを送る', zh:'💬 发送反馈'},
+  reportProblemBtn: {de:'Problem melden', tr:'🐞 Sorun Bildir', en:'🐞 Report a Problem', ja:'🐞 問題を報告', zh:'🐞 报告问题'},
+  reportProblemSuccess: {de:'Danke, das Problem wurde gemeldet.', tr:'Teşekkürler, sorun bildirildi.', en:'Thanks, the problem has been reported.', ja:'ご報告ありがとうございます。問題が報告されました。', zh:'谢谢,问题已报告。'},
+  reportProblemError: {de:'Problem konnte nicht gemeldet werden.', tr:'Sorun bildirilemedi.', en:'Could not report the problem.', ja:'問題を報告できませんでした。', zh:'无法报告问题。'},
+  clearDataBtn: {de:'Alle Daten loeschen', tr:'🗑️ Tüm Verileri Temizle', en:'🗑️ Clear All Data', ja:'🗑️ すべてのデータを削除', zh:'🗑️ 清除所有数据'},
+  clearDataTitle: {de:'Bist du sicher?', tr:'Emin misin?', en:'Are you sure?', ja:'よろしいですか?', zh:'您确定吗?'},
+  clearDataWarning: {de:'Deine Watchliste, dein Suchverlauf und alle Einstellungen werden dauerhaft geloescht. Dies kann nicht rueckgaengig gemacht werden.', tr:'Takip listen, arama geçmişin ve tüm tercihlerin kalıcı olarak silinecek. Bu işlem geri alınamaz.', en:'Your watchlist, search history, and all preferences will be permanently deleted. This cannot be undone.', ja:'ウォッチリスト、検索履歴、すべての設定が完全に削除されます。この操作は元に戻せません。', zh:'您的关注列表、搜索历史和所有偏好设置将被永久删除。此操作无法撤销。'},
+  clearDataConfirmBtn: {de:'Ja, loeschen', tr:'Evet, Sil', en:'Yes, Delete', ja:'はい、削除します', zh:'是的,删除'},
+  offlineMessage: {de:'Keine Internetverbindung. Manche Funktionen funktionieren moeglicherweise nicht.', tr:'📡 İnternet bağlantın yok. Bazı özellikler çalışmayabilir.', en:'📡 No internet connection. Some features may not work.', ja:'📡 インターネット接続がありません。一部の機能が動作しない場合があります。', zh:'📡 没有网络连接。某些功能可能无法使用。'},
+  invalidAmountRange: {de:'Bitte gib einen gueltigen (positiven, angemessenen) Betrag ein.', tr:'Lütfen geçerli (pozitif ve makul büyüklükte) bir tutar gir.', en:'Please enter a valid (positive, reasonable) amount.', ja:'有効な(正の、妥当な範囲の)金額を入力してください。', zh:'请输入有效的(正数且合理范围内的)金额。'},
+  egLabel: {tr:'Örn.', en:'E.g.', de:'Z.B.', ja:'例:', zh:'例如:'},
+  trackingDisclaimer: {tr:'Not: Fiyat verisi şu an simüle edildiği için gerçek zamanlı "fiyat düştü" tespiti yapılamıyor. Bu hatırlatma, telefonunun bildirim sistemi üzerinden düzenli aralıklarla "tekrar kontrol et" mesajı gönderir.', en:'Note: Since price data is currently simulated, real-time "price drop" detection is not possible. This reminder sends a "check again" message at regular intervals via your phone\'s notification system.', de:'Hinweis: Da die Preisdaten derzeit simuliert werden, ist eine Echtzeit-Erkennung von Preissenkungen nicht moeglich. Diese Erinnerung sendet in regelmaessigen Abstaenden eine "erneut pruefen"-Nachricht ueber das Benachrichtigungssystem deines Telefons.', ja:'注: 現在価格データはシミュレートされているため、リアルタイムの「値下げ」検出はできません。このリマインダーは、お使いの携帯電話の通知システムを通じて定期的に「再確認」メッセージを送信します。', zh:'注意:由于价格数据目前是模拟的,无法进行实时"降价"检测。此提醒将通过您手机的通知系统定期发送"重新检查"消息。'},
+  appErrorMessage: {tr:'Bir şeyler ters gitti.', en:'Something went wrong.', de:'Etwas ist schiefgelaufen.', ja:'問題が発生しました。', zh:'出了点问题。'},
+  restartBtn: {tr:'Yeniden Başlat', en:'Restart', de:'Neu starten', ja:'再起動', zh:'重新启动'},
+  selectTwoCurrencies: {tr:'Lütfen farklı iki para birimi seç.', en:'Please select two different currencies.', de:'Bitte waehle zwei unterschiedliche Waehrungen.', ja:'2つの異なる通貨を選択してください。', zh:'请选择两种不同的货币。'},
+  calculatedWithApp: {tr:'Fiyatla ile hesaplandı', en:'calculated with Fiyatla', de:'berechnet mit Fiyatla', ja:'Fiyatlaで計算', zh:'由Fiyatla计算'},
+  sparklineLabel: {tr:'Son 7 gün', en:'Last 7 days', de:'Letzte 7 Tage', ja:'過去7日間', zh:'最近7天'},
+  countryGermany: {tr:'Almanya', en:'Germany', de:'Deutschland', ja:'ドイツ', zh:'德国'},
+  countryFrance: {tr:'Fransa', en:'France', de:'Frankreich', ja:'フランス', zh:'法国'},
+  countryUK: {tr:'İngiltere', en:'UK', de:'Grossbritannien', ja:'イギリス', zh:'英国'},
+  countryTurkey: {tr:'Türkiye', en:'Turkey', de:'Tuerkei', ja:'トルコ', zh:'土耳其'},
+  rateLabel: {tr:'kur', en:'rate', de:'Kurs', ja:'レート', zh:'汇率'},
+  trackThisProductBtn: {tr:'🔔 Bu ürünü takip et', en:'🔔 Track this product', de:'🔔 Dieses Produkt verfolgen', ja:'🔔 この商品を追跡', zh:'🔔 关注此商品'},
+  notifTitle: {tr:'Fiyat Takibi - Fiyatla', en:'Price Tracking - Fiyatla', de:'Preisverfolgung - Fiyatla', ja:'価格追跡 - Fiyatla', zh:'价格追踪 - Fiyatla'},
+};
+
+const TRANSLATIONS_FN = {
+  invalidBarcodeFormat: (len) => ({
+    de: `Ungueltiges Barcode-Format: ${len} Ziffern eingegeben. Barcodes haben normalerweise 8, 12, 13 oder 14 Ziffern.`, tr: `Geçersiz barkod formatı: ${len} hane girildi. Barkodlar genelde 8, 12, 13 ya da 14 hanelidir.`,
+    en: `Invalid barcode format: ${len} digits entered. Barcodes are usually 8, 12, 13, or 14 digits.`,
+    ja: `無効なバーコード形式: ${len}桁入力されました。通常は8、12、13、14桁です。`,
+    zh: `条码格式无效:输入了${len}位。条码通常为8、12、13或14位。`,
+  }),
+  barcodeHintInvalid: (len) => ({
+    de: `${len} Ziffern eingegeben - muss 8, 12, 13 oder 14 sein.`, tr: `${len} hane girildi — 8, 12, 13 ya da 14 hane olmalı.`,
+    en: `${len} digits entered — must be 8, 12, 13, or 14.`,
+    ja: `${len}桁入力されました — 8、12、13、14桁である必要があります。`,
+    zh: `已输入${len}位——必须为8、12、13或14位。`,
+  }),
+  productFetchError: (msg) => ({
+    de: `Produktinformationen konnten nicht abgerufen werden: ${msg}`, tr: `Ürün bilgisi alınamadı: ${msg}`,
+    en: `Could not fetch product info: ${msg}`,
+    ja: `商品情報を取得できませんでした: ${msg}`,
+    zh: `无法获取商品信息:${msg}`,
+  }),
+  noResultsFor: (query) => ({
+    de: `Keine Ergebnisse fuer "${query}". Versuche einen anderen Suchbegriff oder suche per Barcode.`, tr: `"${query}" için sonuç bulunamadı. Farklı bir arama terimi dene ya da barkod ile ara.`,
+    en: `No results for "${query}". Try a different search term or search by barcode.`,
+    ja: `「${query}」の結果が見つかりません。別の検索語かバーコードでお試しください。`,
+    zh: `未找到"${query}"的结果。请尝试其他搜索词或使用条码搜索。`,
+  }),
+  trackScheduleError: (msg) => ({
+    de: `Produkt zur Watchliste hinzugefuegt, aber Erinnerung konnte nicht geplant werden: ${msg}`, tr: `Ürün takip listesine eklendi ama bildirim planlanamadı: ${msg}`,
+    en: `Product added to watchlist but reminder could not be scheduled: ${msg}`,
+    ja: `商品は追加されましたが、リマインダーを設定できませんでした: ${msg}`,
+    zh: `商品已添加但无法设置提醒:${msg}`,
+  }),
+  trackSuccess: (name) => ({
+    de: `"${name}" wurde zur Watchliste hinzugefuegt. Du erhaeltst eine taegliche Erinnerung.`, tr: `"${name}" takip listesine eklendi. Her gün hatırlatma bildirimi alacaksın.`,
+    en: `"${name}" added to your watchlist. You will get a daily reminder.`,
+    ja: `「${name}」がウォッチリストに追加されました。毎日リマインダーが届きます。`,
+    zh: `"${name}"已加入关注列表。您将每天收到提醒。`,
+  }),
+  compareMatch: (score) => ({
+    de: `${score}% Uebereinstimmung`, tr: `%${score} eşleşme`,
+    en: `${score}% match`,
+    ja: `一致度 ${score}%`,
+    zh: `匹配度 ${score}%`,
+  }),
+  notifBody: (name, price) => ({
+    tr: `${name} için fiyatları tekrar kontrol etme zamanı geldi (hedefin: €${price})`,
+    en: `Time to check prices again for ${name} (your target: €${price})`,
+    de: `Zeit, die Preise fuer ${name} erneut zu pruefen (dein Ziel: ${price} Euro)`,
+    ja: `${name}の価格を再確認する時間です(目標: €${price})`,
+    zh: `该重新检查${name}的价格了(目标: €${price})`,
+  }),
+  checkNowTargetReached: (name, price) => ({
+    tr: `✅ ${name}: Hedef fiyata ulaşıldı! Güncel: €${price}`,
+    en: `✅ ${name}: Target price reached! Current: €${price}`,
+    de: `✅ ${name}: Zielpreis erreicht! Aktuell: €${price}`,
+    ja: `✅ ${name}: 目標価格に到達しました!現在: €${price}`,
+    zh: `✅ ${name}: 已达到目标价格!当前: €${price}`,
+  }),
+  checkNowPriceFound: (name, price) => ({
+    tr: `🔍 ${name}: Güncel gerçek fiyat €${price} (hedefe henüz ulaşılmadı)`,
+    en: `🔍 ${name}: Current real price €${price} (target not reached yet)`,
+    de: `🔍 ${name}: Aktueller echter Preis €${price} (Ziel noch nicht erreicht)`,
+    ja: `🔍 ${name}: 現在の実際の価格 €${price}(まだ目標未達)`,
+    zh: `🔍 ${name}: 当前真实价格 €${price}(尚未达到目标)`,
+  }),
+  checkNowNoData: (name) => ({
+    tr: `❓ ${name} için gerçek fiyat verisi bulunamadı`,
+    en: `❓ No real price data found for ${name}`,
+    de: `❓ Keine echten Preisdaten fuer ${name} gefunden`,
+    ja: `❓ ${name}の実際の価格データが見つかりません`,
+    zh: `❓ 未找到${name}的真实价格数据`,
+  }),
+  checkNowRateLimited: (name) => ({
+    tr: `⏳ ${name}: Günlük fiyat sorgulama limiti doldu, lütfen yarın tekrar dene`,
+    en: `⏳ ${name}: Daily price lookup limit reached, please try again tomorrow`,
+    de: `⏳ ${name}: Taegliches Preisabfragelimit erreicht, bitte versuche es morgen erneut`,
+    ja: `⏳ ${name}: 1日の価格照会上限に達しました。明日もう一度お試しください`,
+    zh: `⏳ ${name}: 已达到每日价格查询上限，请明天再试`,
+  }),
+  sparklineAria: (from, to, pct, up) => ({
+    tr: `${from} / ${to} son 7 gün trendi: ${up ? 'yükseldi' : 'düştü'} %${pct}`,
+    en: `${from} / ${to} 7-day trend: ${up ? 'up' : 'down'} ${pct}%`,
+    de: `${from} / ${to} 7-Tage-Trend: ${up ? 'gestiegen' : 'gesunken'} um ${pct}%`,
+    ja: `${from} / ${to} 過去7日間の傾向: ${up ? '上昇' : '下落'} ${pct}%`,
+    zh: `${from} / ${to} 过去7天趋势:${up ? '上涨' : '下跌'}${pct}%`,
+  }),
+};
+
+function td(key, ...args){
+  const entry = TRANSLATIONS_FN[key];
+  if(!entry) return key;
+  const result = entry(...args);
+  return result[state.lang] || result.tr;
+}
+
+function formatNumber(num, decimals){
+  const localeMap = { tr:'tr-TR', en:'en-US', de:'de-DE', ja:'ja-JP', zh:'zh-CN' };
+  const locale = localeMap[state.lang] || 'en-US';
+  try{
+    return new Intl.NumberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(num);
+  }catch(e){
+    return num.toFixed(decimals);
+  }
+}
+
+function t(key){
+  const entry = TRANSLATIONS[key];
+  if(!entry) return key;
+  return entry[state.lang] || entry.tr;
+}
+
+function setLanguage(lang){
+  state.lang = lang;
+  try{ localStorage.setItem('fiyatla_lang', lang); }catch(e){}
+  document.documentElement.lang = lang;
+  logAnalyticsEvent('language_changed', { language: lang });
+  const defaultCcy = LANG_TO_CCY[lang];
+  if(defaultCcy){
+    state.fromCcy = defaultCcy;
+    state.toCcy = defaultCcy === 'USD' ? 'EUR' : 'USD';
+  }
+  render();
+}
+
+function renderLangBar(){
+  const langs = [
+    {code:'tr', flag:'🇹🇷', name:'Türkçe'},
+    {code:'en', flag:'🇬🇧', name:'English'},
+    {code:'de', flag:'🇩🇪', name:'Deutsch'},
+    {code:'ja', flag:'🇯🇵', name:'日本語'},
+    {code:'zh', flag:'🇨🇳', name:'中文'},
+  ];
+  return `<div class="lang-bar">
+    <button class="theme-btn" onclick="goTo('settings')" aria-label="${t('settingsMenuLabel')}">ℹ️</button>
+    <button class="theme-btn" onclick="cycleTheme()" aria-label="${t('themeToggleAria')}">${themeIcon()}</button>
+    ${langs.map(l => `<button class="lang-btn ${state.lang===l.code?'active':''}" onclick="setLanguage('${l.code}')" aria-label="${l.name}">${l.flag}</button>`).join('')}
+  </div>`;
+}
+
+let savedLang = 'tr';
+try{ savedLang = localStorage.getItem('fiyatla_lang') || 'tr'; }catch(e){}
+let savedThemeOverride = null;
+try{ savedThemeOverride = localStorage.getItem('fiyatla_theme_override') || null; }catch(e){}
+
+const initialFromCcy = LANG_TO_CCY[savedLang] || 'TRY';
+const initialToCcy = initialFromCcy === 'USD' ? 'EUR' : 'USD';
+let state = { screen: 'home', stream: null, fromCcy: initialFromCcy, toCcy: initialToCcy, lang: savedLang, themeOverride: savedThemeOverride };
+// <html lang="tr"> statik olarak yazilmisti; kaydedilmis bir dil tercihi
+// varsa (ekran okuyucular/tarayici dil algilamasi icin) acilista da
+// uygulanmali - onceden sadece kullanici elle dil degistirdiginde
+// (setLanguage()) guncelleniyordu.
+document.documentElement.lang = savedLang;
+
+function systemPrefersDark(){
+  try{
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }catch(e){
+    return true;
+  }
+}
+
+function resolvedTheme(){
+  return state.themeOverride || (systemPrefersDark() ? 'dark' : 'light');
+}
+
+function applyTheme(){
+  const app = document.getElementById('app');
+  if(!app) return;
+  if(resolvedTheme() === 'light'){
+    app.classList.add('light-theme');
+  }else{
+    app.classList.remove('light-theme');
+  }
+  updateStatusBar();
+}
+
+async function updateStatusBar(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.StatusBar) return;
+  try{
+    const isLight = resolvedTheme() === 'light';
+    await window.Capacitor.Plugins.StatusBar.setStyle({ style: isLight ? 'LIGHT' : 'DARK' });
+    await window.Capacitor.Plugins.StatusBar.setBackgroundColor({ color: isLight ? '#FAF8F4' : '#0F1B1E' });
+  }catch(e){}
+}
+
+function cycleTheme(){
+  const current = state.themeOverride;
+  let next;
+  if(current === null) next = 'light';
+  else if(current === 'light') next = 'dark';
+  else next = null;
+  state.themeOverride = next;
+  try{
+    if(next) localStorage.setItem('fiyatla_theme_override', next);
+    else localStorage.removeItem('fiyatla_theme_override');
+  }catch(e){}
+  render();
+}
+
+function themeIcon(){
+  if(state.themeOverride === 'light') return '☀️';
+  if(state.themeOverride === 'dark') return '🌙';
+  return '🖥️';
+}
+
+if(window.matchMedia){
+  try{
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if(state.themeOverride === null) render();
+    });
+  }catch(e){}
+}
+
+let animateNextRender = false;
+
+function render(){
+  const app = document.getElementById('app');
+  try{
+    applyTheme();
+    if(navigator.onLine === false) showOfflineBanner();
+    let content = '';
+    if(state.screen === 'home') content = renderHome();
+    else if(state.screen === 'convert') content = renderConvert();
+    else if(state.screen === 'scan') content = renderScan();
+    else if(state.screen === 'tracking') content = renderTracking();
+    else if(state.screen === 'settings') content = renderSettings();
+    if(animateNextRender){
+      app.innerHTML = '<div class="screen-anim">' + content + '</div>';
+      animateNextRender = false;
+    }else{
+      app.innerHTML = content;
+    }
+    attachHandlers();
+  }catch(err){
+    console.log('Render hatasi:', err.message);
+    try{
+      state.screen = 'home';
+      app.innerHTML = '<div style="padding:40px 24px; text-align:center;"><p style="font-size:15px; margin-bottom:16px;">' + t('appErrorMessage') + '</p><button class="primary" onclick="location.reload()">' + t('restartBtn') + '</button></div>';
+    }catch(e2){}
+  }
+}
+
+let tickerCache = { html: null, lang: null, ratesKey: null };
+
+function renderTicker(){
+  const ratesKey = JSON.stringify(RATES_TO_EUR);
+  if(tickerCache.html !== null && tickerCache.lang === state.lang && tickerCache.ratesKey === ratesKey){
+    return tickerCache.html;
+  }
+  const eurItems = Object.entries(RATES_TO_EUR)
+    .filter(([code]) => code !== 'TRY')
+    .map(([code, rate]) => `<span>1 ${code} = <b>€${formatNumber(rate, 4)}</b></span>`);
+  const tryItems = Object.entries(RATES_TO_EUR)
+    .filter(([code]) => code !== 'TRY')
+    .map(([code]) => {
+      const inTry = convertAmount(1, code, 'TRY');
+      return `<span>1 ${code} = <b>₺${formatNumber(inTry, 2)}</b></span>`;
+    });
+  const html = [...eurItems, ...tryItems].join('');
+  const result = `<div class="ticker" aria-hidden="true"><div class="ticker-track">${html}${html}</div></div>`;
+  tickerCache = { html: result, lang: state.lang, ratesKey };
+  return result;
+}
+
+function sendFeedback(){
+  const subject = encodeURIComponent('Fiyatla - Geri Bildirim (v' + APP_VERSION + ')');
+  const body = encodeURIComponent('Merhaba,\n\n');
+  window.open('mailto:support.fiyatla@gmail.com?subject=' + subject + '&body=' + body, '_system');
+}
+
+async function reportProblem(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseCrashlytics){
+    showToast(t('reportProblemError'));
+    return;
+  }
+  try{
+    await window.Capacitor.Plugins.FirebaseCrashlytics.recordException({
+      message: `Kullanici sorun bildirdi - ekran: ${state.screen}, dil: ${state.lang}, surum: ${APP_VERSION}`,
+    });
+    await window.Capacitor.Plugins.FirebaseCrashlytics.sendUnsentReports();
+    showToast(t('reportProblemSuccess'));
+  }catch(e){
+    showToast(t('reportProblemError'));
+  }
+}
+
+function confirmClearAllData(){
+  openModal('clear-data-modal-overlay', `
+    <div class="modal-card">
+      <p class="eyebrow" id="modal-a11y-title">⚠️ ${t('clearDataTitle')}</p>
+      <p class="modal-sub">${t('clearDataWarning')}</p>
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="closeClearDataModal()">${t('trackVazgec')}</button>
+        <button class="modal-btn-primary" style="background:var(--danger); color:#fff;" onclick="executeClearAllData()">${t('clearDataConfirmBtn')}</button>
+      </div>
+    </div>
+  `);
+}
+
+function closeClearDataModal(){
+  closeModal('clear-data-modal-overlay');
+}
+
+function executeClearAllData(){
+  try{
+    localStorage.clear();
+  }catch(e){}
+  location.reload();
+}
+
+function manageAdPrivacy(){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AdMob){
+    window.Capacitor.Plugins.AdMob.showPrivacyOptionsForm().catch(e => {
+      console.log('Gizlilik formu gosterilemedi:', e.message);
+    });
+  }
+}
+
+function renderSettings(){
+  return `${renderLangBar()}
+    <header class="top">
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow"></span> ${t('back')}</button>
+      <p class="eyebrow">${t('settingsMenuLabel')}</p>
+      <h1>${t('settingsTitle')}</h1>
+      <p class="sub">${t('settingsSub')}</p>
+    </header>
+    <main>
+      <div class="card">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="window.open('https://hudayid0.github.io/Fiyatkontrolapp/privacy.html', '_system')">${t('privacyPolicyLink')}</button>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="window.open('https://hudayid0.github.io/Fiyatkontrolapp/terms.html', '_system')">${t('termsLink')}</button>
+      </div>
+      ${window.adConsentAvailable ? `
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="manageAdPrivacy()">${t('managePrivacyBtn')}</button>
+      </div>
+      ` : ''}
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="sendFeedback()">${t('feedbackBtn')}</button>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="reportProblem()">${t('reportProblemBtn')}</button>
+      </div>
+      <div class="card card-static" style="margin-top:12px;">
+        <p style="font-weight:600; margin-bottom:4px;">${t('batteryTipTitle')}</p>
+        <p class="sub" style="font-size:13px;">${t('batteryTipBody')}</p>
+      </div>
+      <div class="card" style="margin-top:12px; text-align:center;">
+        <p class="sub">${t('contactLabel')}: <a href="mailto:support.fiyatla@gmail.com" style="color:var(--gold-soft);">support.fiyatla@gmail.com</a></p>
+        <p class="sub" style="margin-top:6px;">Fiyatla v${APP_VERSION}</p>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <button class="primary" style="background:var(--surface-2); color:var(--danger); box-shadow:none; border:1px solid var(--danger);" onclick="confirmClearAllData()">${t('clearDataBtn')}</button>
+      </div>
+    </main>
+  `;
+}
+
+function renderHome(){
+  return `
+    ${renderLangBar()}
+    ${renderTicker()}
+    <header class="top">
+      <p class="eyebrow">${t('eyebrowHome')}</p>
+      <h1>${t('homeTitle')}</h1>
+      <p class="sub">${t('homeSub')}</p>
+    </header>
+    <main>
+      <div class="card gold" onclick="goTo('convert')">
+        <span class="num">${t('card1Num')}</span>
+        <h2>${t('card1Title')}</h2>
+        <p>${t('card1Desc')}</p>
+      </div>
+      <div class="card teal" onclick="goTo('scan')">
+        <span class="num">${t('card2Num')}</span>
+        <h2>${t('card2Title')}</h2>
+        <p>${t('card2Desc')}</p>
+      </div>
+      <div class="card" onclick="goTo('tracking')" style="border-left:3px solid var(--gold-soft);">
+        <span class="num">${t('card3Num')}</span>
+        <h2>${t('card3Title')}</h2>
+        <p>${t('card3Desc')}</p>
+      </div>
+    </main>
+    <footer>${t('footerHome')} · v${APP_VERSION}</footer>
+  `;
+}
+
+function renderConvert(){
+  return `
+    <header class="top">
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow"></span> ${t('back')}</button>
+      <p class="eyebrow">${t('convertEyebrow')}</p>
+      <h1>${t('convertTitle')}</h1>
+    </header>
+    <main>
+      <div>
+        <label>${t('amountLabel')}</label>
+        <input type="number" id="amount" placeholder="1500" inputmode="decimal" value="${state.lastAmount || ''}" oninput="state.lastAmount = this.value" />
+      </div>
+      <div class="row" style="align-items:end;">
+        <div style="flex:1;">
+          <label>${t('fromLabel')}</label>
+          <select id="from-currency" onchange="onCurrencyChange()">
+            ${CURRENCIES.map(code=>`<option value="${code}" ${code===state.fromCcy?'selected':''}>${ccyName(code)} (${code})</option>`).join('')}
+          </select>
+        </div>
+        <button class="swap-btn" onclick="swapCurrencies()" aria-label="${t('ariaSwap')}">⇄</button>
+        <div style="flex:1;">
+          <label>${t('toLabel')}</label>
+          <select id="to-currency" onchange="onCurrencyChange()">
+            ${CURRENCIES.map(code=>`<option value="${code}" ${code===state.toCcy?'selected':''}>${ccyName(code)} (${code})</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <button class="primary" onclick="doConvert()">${t('convertBtn')}</button>
+      <div id="convert-result" aria-live="polite" aria-atomic="true"></div>
+    </main>
+    <footer>${rateStatusLabel()}</footer>
+  `;
+}
+
+function renderScan(){
+  const mode = state.searchMode || 'barcode';
+  const history = getSearchHistory();
+  return `
+    <header class="top">
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow"></span> ${t('back')}</button>
+      <p class="eyebrow">${t('scanEyebrow')}</p>
+      <h1>${t('scanTitle')}</h1>
+      <p class="sub">${t('scanSub')}</p>
+    </header>
+    <main>
+      <div class="scan-box" id="scan-box">
+        <p class="cam-msg" id="cam-msg">${t('camStartHint')}</p>
+      </div>
+      <div class="row">
+        <button class="primary teal-btn" id="cam-btn" style="flex:1;" onclick="startCamera()">${t('camOpenBtn')}</button>
+        <button class="primary" style="flex:1; background:var(--surface-2); color:var(--text); box-shadow:none; border:1px solid var(--line);" onclick="document.getElementById('gallery-input').click()">${t('galleryBtn')}</button>
+      </div>
+      <input type="file" accept="image/*" id="gallery-input" style="display:none;" onchange="handleGalleryImage(event)" />
+      <div class="divider">${t('orManual')}</div>
+
+      <div class="tabs">
+        <button class="tab-btn ${mode==='barcode'?'active':''}" onclick="setSearchMode('barcode')" role="tab" aria-selected="${mode==='barcode'}">${t('tabBarcode')}</button>
+        <button class="tab-btn ${mode==='name'?'active':''}" onclick="setSearchMode('name')" role="tab" aria-selected="${mode==='name'}">${t('tabName')}</button>
+      </div>
+
+      <div class="tab-content-anim">
+      ${mode === 'barcode' ? `
+        <div>
+          <label>${t('barcodeLabel')}</label>
+          <input type="text" id="barcode" placeholder="${t('egLabel')} 4006381333931" inputmode="numeric" maxlength="14" />
+          <div class="hint" id="barcode-hint">${t('barcodeHintDefault')}</div>
+        </div>
+        <button class="primary" onclick="lookupBarcode()">${t('findProductBtn')}</button>
+      ` : `
+        <div>
+          <label>${t('productNameLabel')}</label>
+          <input type="text" id="product-name" placeholder="${t('egLabel')} Nutella 400g" />
+        </div>
+        <button class="primary" onclick="searchByName()">${t('searchBtn')}</button>
+      `}
+      </div>
+
+      <div id="scan-result" aria-live="polite" aria-atomic="true"></div>
+
+      ${history.length ? `
+        <div class="history-block">
+          <label>${t('recentSearches')}</label>
+          <div class="history-chips">
+            ${history.map(h => {
+              return `<button class="chip" onclick="rerunHistory('${onclickSafe(h.mode)}','${onclickSafe(h.value)}')">${escapeHtml(h.value)}</button>`;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </main>
+    <footer>${t('footerScan')}</footer>
+  `;
+}
+
+function attachHandlers(){
+  const inp = document.getElementById('amount');
+  if(inp){
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') doConvert(); });
+    if(state.lastAmount) doConvert();
+  }
+
+  const bc = document.getElementById('barcode');
+  if(bc){
+    bc.addEventListener('keydown', e=>{ if(e.key==='Enter') lookupBarcode(); });
+    bc.addEventListener('input', e=>{
+      e.target.value = e.target.value.replace(/[^0-9]/g,'');
+      const hint = document.getElementById('barcode-hint');
+      if(!hint) return;
+      const len = e.target.value.length;
+      const valid = [8,12,13,14].includes(len);
+      if(len === 0){
+        hint.textContent = t('barcodeHintDefault');
+        hint.classList.remove('warn');
+      }else if(valid){
+        hint.textContent = t('barcodeHintValid');
+        hint.classList.remove('warn');
+      }else{
+        hint.textContent = td('barcodeHintInvalid', len);
+        hint.classList.add('warn');
+      }
+    });
+  }
+
+  const pn = document.getElementById('product-name');
+  if(pn) pn.addEventListener('keydown', e=>{ if(e.key==='Enter') searchByName(); });
+}
+
+function setSearchMode(mode){
+  if(state.searchMode !== mode) stopCamera();
+  state.searchMode = mode;
+  render();
+}
+
+function addToHistory(mode, value){
+  let history = getSearchHistory().filter(h => h.value !== value);
+  history.unshift({mode, value});
+  history = history.slice(0, 6);
+  saveSearchHistory(history);
+}
+
+function rerunHistory(mode, value){
+  state.searchMode = mode;
+  render();
+  if(mode === 'barcode'){
+    document.getElementById('barcode').value = value;
+    lookupBarcode();
+  }else{
+    document.getElementById('product-name').value = value;
+    searchByName();
+  }
+}
+
+function goTo(screen){
+  stopCamera();
+  state.screen = screen;
+  animateNextRender = true;
+  logScreenView(screen);
+  render();
+}
+
+// ---- Screen 1: currency conversion (static/frozen rates, no network call) ----
+function onCurrencyChange(){
+  state.fromCcy = document.getElementById('from-currency').value;
+  state.toCcy = document.getElementById('to-currency').value;
+}
+
+function swapCurrencies(){
+  const tmp = state.fromCcy;
+  state.fromCcy = state.toCcy;
+  state.toCcy = tmp;
+  render();
+}
+
+function doConvert(){
+  if(!debounceAction('doConvert', 300)) return;
+  const amount = parseFloat(document.getElementById('amount').value);
+  const from = document.getElementById('from-currency').value;
+  const to = document.getElementById('to-currency').value;
+  state.fromCcy = from;
+  state.toCcy = to;
+  const resultBox = document.getElementById('convert-result');
+  if(!amount || amount <= 0 || amount > 1000000000000){
+    resultBox.innerHTML = `<div class="error">${t('invalidAmountRange')}</div>`;
+    return;
+  }
+  if(from === to){
+    resultBox.innerHTML = `<div class="error">${t('selectTwoCurrencies')}</div>`;
+    return;
+  }
+  const converted = convertAmount(amount, from, to);
+  const rate = crossRate(from, to);
+  logAnalyticsEvent('currency_converted', { from_currency: from, to_currency: to, amount });
+  const shareMsg = `${amount} ${from} = ${formatNumber(converted, 2)} ${to} (${t('calculatedWithApp')})`;
+  resultBox.innerHTML = `
+    <div class="result">
+      <div class="big">${formatNumber(converted, 2)} ${to}</div>
+      <div class="small">${amount} ${from} · ${t('rateLabel')}: 1 ${from} = ${formatNumber(rate, 4)} ${to}</div>
+      <div class="small" style="margin-top:6px;">${rateStatusLabel()}</div>
+      <div id="sparkline-area"></div>
+      <button id="convert-share-btn" class="chip" style="margin-top:10px;">📤 ${t('shareBtn')}</button>
+    </div>
+  `;
+  const shareBtn = document.getElementById('convert-share-btn');
+  if(shareBtn) shareBtn.onclick = () => shareText(shareMsg);
+  renderSparklineArea(from, to);
+}
+
+// ---- Screen 2: camera + barcode ----
+async function toggleTorch(){
+  if(!state.torchTrack) return;
+  state.torchOn = !state.torchOn;
+  try{
+    await state.torchTrack.applyConstraints({advanced: [{torch: state.torchOn}]});
+    const btn = document.getElementById('torch-btn');
+    if(btn) btn.textContent = state.torchOn ? '🔦✅' : '🔦';
+  }catch(e){
+    console.log('Torch degistirilemedi:', e.message);
+  }
+}
+
+async function startCamera(){
+  const box = document.getElementById('scan-box');
+  const btn = document.getElementById('cam-btn');
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    state.stream = stream;
+    box.innerHTML = `<video id="video" autoplay playsinline muted></video><div class="scan-frame"></div><button id="torch-btn" class="chip" style="position:absolute; bottom:12px; right:12px; display:none; z-index:5;" onclick="toggleTorch()">🔦</button>`;
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    const camTrack = stream.getVideoTracks()[0];
+    state.torchTrack = camTrack;
+    state.torchOn = false;
+    try{
+      const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
+      if(caps.torch){
+        const torchBtn = document.getElementById('torch-btn');
+        if(torchBtn) torchBtn.style.display = 'block';
+      }
+    }catch(e){}
+    btn.textContent = t('camCloseBtn');
+    btn.setAttribute('onclick','stopCamera(); resetCamBox();');
+
+    if('BarcodeDetector' in window){
+      const detector = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']});
+      const scanLoop = async () => {
+        if(!state.stream) return;
+        try{
+          const codes = await detector.detect(video);
+          if(codes.length > 0){
+            document.getElementById('barcode').value = codes[0].rawValue;
+            stopCamera();
+            resetCamBox();
+            lookupBarcode();
+            return;
+          }
+        }catch(e){}
+        if(state.stream) requestAnimationFrame(scanLoop);
+      };
+      requestAnimationFrame(scanLoop);
+    }
+  }catch(err){
+    let camMsg = t('camGenericError');
+    if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'SecurityError'){
+      camMsg = t('camPermissionDenied');
+    }
+    box.innerHTML = `<p class="cam-msg">${camMsg}</p>`;
+    console.log('Kamera hatasi:', err.name, err.message);
+  }
+}
+
+function stopCamera(){
+  if(state.stream){
+    state.stream.getTracks().forEach(t=>t.stop());
+    state.stream = null;
+  }
+}
+
+function resetCamBox(){
+  const box = document.getElementById('scan-box');
+  const btn = document.getElementById('cam-btn');
+  if(!box) return;
+  box.innerHTML = `<p class="cam-msg">${t('camStartHint')}</p>`;
+  if(btn){ btn.textContent = t('camOpenBtn'); btn.setAttribute('onclick','startCamera()'); }
+}
+
+// ---- Product lookup (Open Food Facts - real API) ----
+function maybeShowOnboarding(openCount){
+  if(openCount !== 1) return;
+  showOnboardingModal();
+}
+
+function showOnboardingModal(){
+  openModal('onboarding-modal-overlay', `
+    <div class="modal-card">
+      <p class="eyebrow" id="modal-a11y-title">👋 ${t('onboardingTitle')}</p>
+      <p class="modal-sub">${t('onboardingIntro')}</p>
+      <div class="onboarding-flow">
+        <div class="onboarding-step">
+          <div class="onboarding-icon">📷</div>
+          <p class="onboarding-step-title">${t('onboardingStep1Title')}</p>
+          <p class="onboarding-step-sub">${t('onboardingStep1Sub')}</p>
+        </div>
+        <div class="onboarding-arrow">→</div>
+        <div class="onboarding-step">
+          <div class="onboarding-icon">🔖</div>
+          <p class="onboarding-step-title">${t('onboardingStep2Title')}</p>
+          <p class="onboarding-step-sub">${t('onboardingStep2Sub')}</p>
+        </div>
+        <div class="onboarding-arrow">→</div>
+        <div class="onboarding-step">
+          <div class="onboarding-icon">🔔</div>
+          <p class="onboarding-step-title">${t('onboardingStep3Title')}</p>
+          <p class="onboarding-step-sub">${t('onboardingStep3Sub')}</p>
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="modal-btn-primary" style="width:100%;" onclick="closeOnboardingModal()">${t('onboardingStartBtn')}</button>
+      </div>
+    </div>
+  `);
+}
+
+function closeOnboardingModal(){
+  closeModal('onboarding-modal-overlay');
+}
+
+const APP_VERSION = '1.0.0';
+
+async function checkForUpdate(){
+  try{
+    const res = await fetch('https://raw.githubusercontent.com/hudayid0/Fiyatkontrolapp/main/package.json');
+    if(!res.ok) return;
+    const data = await res.json();
+    const latest = data.version;
+    if(!latest || latest === APP_VERSION) return;
+    const dismissedFor = localStorage.getItem('fiyatla_update_dismissed');
+    if(dismissedFor === latest) return;
+    showUpdateBanner(latest);
+  }catch(e){}
+}
+
+function showUpdateBanner(latestVersion){
+  const existing = document.getElementById('update-banner');
+  if(existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'update-banner';
+  el.style.cssText = 'position:fixed; bottom:0; left:0; right:0; background:var(--gold); color:#1C1400; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; z-index:1800; font-size:13px;';
+  el.innerHTML = `
+    <span>${t('updateAvailableMsg')}</span>
+    <button style="background:transparent; border:none; font-weight:700; text-decoration:underline; color:#1C1400; white-space:nowrap;" onclick="dismissUpdateBanner('${latestVersion}')">${t('updateDismissBtn')}</button>
+  `;
+  document.body.appendChild(el);
+}
+
+function dismissUpdateBanner(version){
+  try{ localStorage.setItem('fiyatla_update_dismissed', version); }catch(e){}
+  const el = document.getElementById('update-banner');
+  if(el) el.remove();
+}
+
+function showOfflineBanner(){
+  let el = document.getElementById('offline-banner');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'offline-banner';
+    el.style.cssText = 'position:fixed; bottom:0; left:0; right:0; background:var(--danger); color:#fff; padding:10px 16px; text-align:center; font-size:13px; z-index:1900;';
+    document.body.appendChild(el);
+  }
+  el.textContent = t('offlineMessage');
+}
+
+function hideOfflineBanner(){
+  const el = document.getElementById('offline-banner');
+  if(el) el.remove();
+}
+
+function setupOfflineDetection(){
+  window.addEventListener('online', hideOfflineBanner);
+  window.addEventListener('offline', showOfflineBanner);
+  if(navigator.onLine === false) showOfflineBanner();
+}
+
+function getAppOpenCount(){
+  let count = 1;
+  try{
+    count = parseInt(localStorage.getItem('fiyatla_open_count') || '0', 10) + 1;
+    localStorage.setItem('fiyatla_open_count', String(count));
+  }catch(e){}
+  return count;
+}
+
+function maybeShowRatePrompt(openCount){
+  try{
+    const status = localStorage.getItem('fiyatla_rate_status');
+    if(status === 'rated' || status === 'never') return;
+    if(openCount < 5) return;
+    const laterCount = parseInt(localStorage.getItem('fiyatla_rate_later_count') || '0', 10);
+    if(laterCount && openCount < laterCount + 10) return;
+    showRateModal();
+  }catch(e){}
+}
+
+function showRateModal(){
+  openModal('rate-modal-overlay', `
+    <div class="modal-card">
+      <p class="eyebrow" id="modal-a11y-title">⭐ ${t('rateTitle')}</p>
+      <p class="modal-sub">${t('rateMessage')}</p>
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="rateLater()">${t('rateLaterBtn')}</button>
+        <button class="modal-btn-primary" onclick="rateNow()">${t('rateNowBtn')}</button>
+      </div>
+      <button class="chip" style="margin-top:12px; width:100%; text-align:center;" onclick="rateNever()">${t('rateNeverBtn')}</button>
+    </div>
+  `);
+}
+
+function closeRateModal(){
+  closeModal('rate-modal-overlay');
+}
+
+function rateNow(){
+  try{ localStorage.setItem('fiyatla_rate_status', 'rated'); }catch(e){}
+  closeRateModal();
+  window.open('https://play.google.com/store/apps/details?id=com.hudayi.fiyatkontrol', '_system');
+}
+
+function rateLater(){
+  try{
+    const count = parseInt(localStorage.getItem('fiyatla_open_count') || '0', 10);
+    localStorage.setItem('fiyatla_rate_later_count', String(count));
+  }catch(e){}
+  closeRateModal();
+}
+
+function rateNever(){
+  try{ localStorage.setItem('fiyatla_rate_status', 'never'); }catch(e){}
+  closeRateModal();
+}
+
+function editTrackedItem(id){
+  const items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  const numericTarget = Number(item.targetPrice);
+  const targetValue = Number.isFinite(numericTarget) ? numericTarget.toFixed(2) : '0.00';
+  openModal('track-modal-overlay', `
+    <div class="modal-card">
+      <p class="eyebrow">${t('trackModalEyebrow')}</p>
+      <h3 class="modal-title" id="modal-a11y-title">${escapeHtml(item.name)}</h3>
+      <p class="modal-sub">${t('trackModalSub')}</p>
+      <input type="number" id="target-price-input" value="${targetValue}" step="0.01" inputmode="decimal" />
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
+        <button class="modal-btn-primary" onclick="confirmEditTrackedItem('${onclickSafe(item.id)}')">${t('trackConfirm')}</button>
+      </div>
+    </div>
+  `);
+}
+
+async function confirmEditTrackedItem(id){
+  const target = parseTargetPriceInput();
+  if(target === null) return;
+  closeTrackModal();
+  const items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+  item.targetPrice = target;
+
+  if(item.notifId && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
+    try{
+      await window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: [{ id: item.notifId }] });
+    }catch(e){}
+    item.notifId = null;
+  }
+
+  item.notifId = await scheduleTrackingNotification(item.name, target, { existingItems: items });
+  saveTrackedItems(items);
+  render();
+}
+
+function buildBackupText(){
+  const items = getTrackedItems();
+  const history = getSearchHistory();
+  const backupObj = {
+    app: 'fiyatla',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    tracked: items,
+    searchHistory: history,
+  };
+  return btoa(unescape(encodeURIComponent(JSON.stringify(backupObj))));
+}
+
+async function exportBackup(){
+  const text = buildBackupText();
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+    }else{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast(t('exportSuccess'));
+  }catch(e){
+    console.log('Export hatasi:', e.message);
+  }
+}
+
+async function exportBackupFile(){
+  const text = buildBackupText();
+  const fileName = `fiyatla-yedek-${new Date().toISOString().slice(0,10)}.txt`;
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share){
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+      const writeResult = await Filesystem.writeFile({
+        path: fileName,
+        data: text,
+        directory: 'CACHE',
+        encoding: 'utf8',
+      });
+      await Share.share({
+        title: t('exportFileBtn'),
+        url: writeResult.uri,
+      });
+      showToast(t('exportSuccess'));
+    }else if(navigator.share){
+      await navigator.share({ text: text, title: t('exportFileBtn') });
+    }else{
+      await exportBackup();
+    }
+  }catch(e){
+    console.log('Dosya paylasim hatasi:', e.message);
+  }
+}
+
+function importBackup(){
+  openModal('import-modal-overlay', `
+    <div class="modal-card">
+      <p class="eyebrow" id="modal-a11y-title">${t('importBtn')}</p>
+      <p class="modal-sub">${t('importPrompt')}</p>
+      <textarea id="import-text-input" rows="4" style="width:100%; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--text); padding:10px; font-size:13px; margin-top:8px;"></textarea>
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="closeImportModal()">${t('trackVazgec')}</button>
+        <button class="modal-btn-primary" onclick="confirmImportBackup()">${t('importBtn')}</button>
+      </div>
+    </div>
+  `);
+}
+
+function closeImportModal(){
+  closeModal('import-modal-overlay');
+}
+
+// Yedek metni tamamen disaridan (kullanicidan kullaniciya paylasilan bir
+// metin olarak) geliyor, guvenilir degil. Beklenmeyen alan tipleri
+// (ornegin object/array yerine gecmesi gereken string) hem render
+// asamasinda hem de sonraki islemlerde (formatNumber, notifId iptali vb.)
+// sorun cikarabilecegi icin, kaydetmeden once her ogeyi kendi beklenen
+// tipine zorlayip gecersizse atiyoruz.
+function sanitizeImportedTrackedItem(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id ?? '').slice(0, 200);
+  const name = String(raw.name ?? '').slice(0, 300);
+  if(!id || !name) return null;
+  const targetPrice = Number(raw.targetPrice);
+  return {
+    id,
+    name,
+    brand: String(raw.brand ?? '').slice(0, 300),
+    code: String(raw.code ?? '').slice(0, 50),
+    targetPrice: Number.isFinite(targetPrice) ? targetPrice : 0,
+    notifId: Number.isInteger(raw.notifId) ? raw.notifId : null,
+    hasRealPriceData: raw.hasRealPriceData === true,
+  };
+}
+
+const IMPORT_MAX_ITEMS = 500;
+
+function confirmImportBackup(){
+  const input = document.getElementById('import-text-input');
+  const raw = input.value.trim();
+  try{
+    const json = decodeURIComponent(escape(atob(raw)));
+    const data = JSON.parse(json);
+    if(!data || data.app !== 'fiyatla' || !Array.isArray(data.tracked)){
+      throw new Error('gecersiz');
+    }
+    const sanitizedTracked = data.tracked
+      .slice(0, IMPORT_MAX_ITEMS)
+      .map(sanitizeImportedTrackedItem)
+      .filter(item => item !== null);
+    const sanitizedHistory = (Array.isArray(data.searchHistory) ? data.searchHistory : [])
+      .slice(0, IMPORT_MAX_ITEMS)
+      .filter(h => h && typeof h.value === 'string' && typeof h.mode === 'string')
+      .map(h => ({ mode: h.mode.slice(0, 20), value: h.value.slice(0, 200) }));
+    saveTrackedItems(sanitizedTracked);
+    saveSearchHistory(sanitizedHistory);
+    closeImportModal();
+    showToast(t('importSuccess'));
+    render();
+  }catch(e){
+    input.style.borderColor = 'var(--danger)';
+    showToast(t('importError'));
+  }
+}
+
+async function refreshProduct(code){
+  try{ localStorage.removeItem('fiyatla_cache_' + code); }catch(e){}
+  state.searchMode = 'barcode';
+  render();
+  const bcInput = document.getElementById('barcode');
+  if(bcInput) bcInput.value = code;
+  lookupBarcode();
+}
+
+window.__lastActionTime = {};
+function debounceAction(key, delayMs){
+  delayMs = delayMs || 800;
+  const now = Date.now();
+  const last = window.__lastActionTime[key] || 0;
+  if(now - last < delayMs) return false;
+  window.__lastActionTime[key] = now;
+  return true;
+}
+
+async function shareText(text){
+  try{
+    if(navigator.share){
+      await navigator.share({ text: text });
+    }else if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+      showToast(t('exportSuccess'));
+    }
+  }catch(e){
+    // kullanici paylasim penceresini iptal etmis olabilir, sorun degil
+  }
+}
+
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Bir degeri onclick="fn('${...}')" gibi inline bir olay isleyicisinin
+// tek tirnakli JS string argumanina gommek icin kullanilir. HTML nitelik
+// (attribute) degerleri once tarayici tarafindan entity-decode edilip
+// SONRA JS olarak derlendigi icin, sadece escapeHtml() yeterli degildir:
+// escapeHtml('\'') -> '&#39;' tarayicida tekrar ham '\'' karakterine
+// donusur ve JS string'ini kirar (orn. isminde kesme isareti olan
+// "Kellogg's" gibi urunlerde oldugu gibi). Once JS string kacisi
+// (ters egik cizgi, tek tirnak), sonra HTML nitelik kacisi uygulanir.
+function onclickSafe(str){
+  if(str === null || str === undefined) return '';
+  const jsEscaped = String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return escapeHtml(jsEscaped);
+}
+
+function isValidBarcodeChecksum(code){
+  const digits = code.split('').map(Number);
+  const n = digits.length;
+  const checkDigit = digits[n-1];
+  let sum = 0;
+  let weight = 3;
+  for(let i = n-2; i >= 0; i--){
+    sum += digits[i] * weight;
+    weight = weight === 3 ? 1 : 3;
+  }
+  const calculated = (10 - (sum % 10)) % 10;
+  return calculated === checkDigit;
+}
+
+function cleanupExpiredCache(){
+  try{
+    const now = Date.now();
+    const keysToRemove = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const key = localStorage.key(i);
+      if(key && key.indexOf('fiyatla_cache_') === 0){
+        try{
+          const entry = JSON.parse(localStorage.getItem(key));
+          if(!entry || (now - entry.timestamp > 24 * 60 * 60 * 1000)){
+            keysToRemove.push(key);
+          }
+        }catch(e){
+          keysToRemove.push(key);
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  }catch(e){}
+}
+
+const PRODUCT_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+function getCachedProduct(code){
+  try{
+    const raw = localStorage.getItem('fiyatla_cache_' + code);
+    if(!raw) return null;
+    const entry = JSON.parse(raw);
+    if(Date.now() - entry.timestamp > PRODUCT_CACHE_TTL) return null;
+    return entry.product;
+  }catch(e){
+    return null;
+  }
+}
+
+function setCachedProduct(code, product){
+  try{
+    localStorage.setItem('fiyatla_cache_' + code, JSON.stringify({product, timestamp: Date.now()}));
+  }catch(e){}
+}
+
+// Gercek fiyat verisi artik UPCitemDB'den degil, ayri ve private tutulan
+// "fiyatla-backend" reposundan (Vercel'e deploy edilir) geliyor - bu
+// backend'in ic mantigi (prompt, model secimi, JSON semasi) burada yok,
+// sadece asagidaki URL'e HTTP istegi atiliyor. Backend gunluk/dakikalik
+// limit veya Anthropic tarafi 429/529 donerse ayni sekilde HTTP 429 ile
+// cevap verir; bunu sessizce "veri yok" ile karistirmamak icin ozel bir
+// isaretci (sentinel) string donuyoruz - cagiran taraflar bunu
+// Array.isArray() ile ayirt edebilir.
+const UPCITEMDB_RATE_LIMITED = 'RATE_LIMITED';
+
+// Vercel'e deploy ettikten sonra projenin gercek alan adiyla guncelle
+// fiyatla-backend'in Vercel'deki gercek adresi.
+const PRICE_LOOKUP_API_URL = 'https://fiyatla-backend.vercel.app/api/price-lookup';
+// Bu, Anthropic API anahtari DEGIL - sadece bu uc noktayi genel internetten
+// gelen rastgele isteklere karsi hafifce kapatan paylasilan bir sirdir.
+// Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlidir - buraya
+// commit edilmez, elle doldurulur.
+const PRICE_LOOKUP_APP_SECRET = '';
+
+// search.openfoodfacts.org icin kullanilan nativeGet'in POST karsiligi -
+// ayni CORS/WebView nedenleriyle native platformda CapacitorHttp uzerinden
+// gonderiyoruz, duz webde fetch()'e dusuyoruz.
+async function nativePost(url, body, headers){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp){
+    const res = await window.Capacitor.Plugins.CapacitorHttp.post({ url, headers, data: body });
+    let data = res.data;
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){}
+    }
+    return { ok: res.status >= 200 && res.status < 300, status: res.status, data };
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function fetchRealOffers(name, brand, code){
+  if(!name) return null;
+  try{
+    const res = await nativePost(
+      PRICE_LOOKUP_API_URL,
+      { name, brand, code },
+      PRICE_LOOKUP_APP_SECRET ? { 'X-App-Secret': PRICE_LOOKUP_APP_SECRET } : {},
+    );
+    if(res.status === 429) return UPCITEMDB_RATE_LIMITED;
+    if(!res.ok || !res.data) return null;
+    const offers = res.data.offers || [];
+    return offers.length > 0 ? offers : null;
+  }catch(e){
+    return null;
+  }
+}
+
+function realOffersToEur(offers){
+  const rows = [];
+  for(const offer of offers){
+    if(!offer || typeof offer.price !== 'number' || offer.price <= 0) continue;
+    const currency = (offer.currency || 'USD').toUpperCase();
+    if(!RATES_TO_EUR[currency]) continue;
+    rows.push({
+      merchant: offer.merchant || '—',
+      priceEur: convertAmount(offer.price, currency, 'EUR'),
+      url: offer.url || '#',
+    });
+  }
+  rows.sort((a,b) => a.priceEur - b.priceEur);
+  return rows;
+}
+
+async function tryUpcItemDb(code){
+  try{
+    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
+    if(!res.ok) return false;
+    const data = await res.json();
+    if(!data.items || data.items.length === 0) return false;
+    const item = data.items[0];
+    const normalized = {
+      product_name: item.title || item.model || 'Bilinmeyen urun',
+      brands: item.brand || '-',
+      image_front_small_url: (item.images && item.images[0]) || '',
+      _source: 'upcitemdb',
+    };
+    renderProductResult(normalized, code);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function lookupBarcode(){
+  if(!debounceAction('lookupBarcode')) return;
+  const code = document.getElementById('barcode').value.trim();
+  const box = document.getElementById('scan-result');
+  if(!code){
+    box.innerHTML = `<div class="error">${t('enterBarcodeMsg')}</div>`;
+    return;
+  }
+  if(![8,12,13,14].includes(code.length)){
+    box.innerHTML = `<div class="error">${td('invalidBarcodeFormat', code.length)}</div>`;
+    return;
+  }
+  if(!isValidBarcodeChecksum(code)){
+    console.log('Checksum uyusmuyor, farkli bir barkod standardi olabilir (orn. Code128) - arama yine de deneniyor.');
+  }
+  addToHistory('barcode', code);
+  const cached = getCachedProduct(code);
+  if(cached){
+    renderProductResult(cached, code);
+    return;
+  }
+  box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingProduct')}</div>`;
+  try{
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+    const data = await res.json();
+    if(data.status !== 1){
+      box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingWiderDb')}</div>`;
+      const found = await tryUpcItemDb(code);
+      if(!found){
+        box.innerHTML = `<div class="error">${t('barcodeNotFoundMsg')}</div>`;
+      }
+      return;
+    }
+    renderProductResult(data.product, code);
+  }catch(err){
+    box.innerHTML = `<div class="error">${td('productFetchError', err.message)}</div>`;
+  }
+}
+
+// search.openfoodfacts.org (search-a-licious, beta) does not send permissive
+// CORS headers like the stable world.openfoodfacts.org API does, so a plain
+// WebView fetch() to it fails with "Failed to fetch" before any response is
+// even read. Native platforms aren't subject to browser CORS, so route
+// through Capacitor's built-in native HTTP client there; fall back to fetch()
+// on plain web (e.g. local testing) where CapacitorHttp isn't present.
+async function nativeGet(url){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp){
+    const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url });
+    let data = res.data;
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){}
+    }
+    return { ok: res.status >= 200 && res.status < 300, status: res.status, data };
+  }
+  const res = await fetch(url);
+  const data = await res.json();
+  return { ok: res.ok, status: res.status, data };
+}
+
+// ---- Product search by name (Open Food Facts search API) ----
+async function searchByName(){
+  if(!debounceAction('searchByName')) return;
+  const query = document.getElementById('product-name').value.trim();
+  const box = document.getElementById('scan-result');
+  if(!query){
+    box.innerHTML = `<div class="error">${t('enterProductNameMsg')}</div>`;
+    return;
+  }
+  addToHistory('name', query);
+  box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingText')}</div>`;
+  try{
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=5&fields=code,product_name,brands,image_front_small_url`;
+    const { ok, data } = await nativeGet(url);
+    if(!ok) throw new Error('API hatasi');
+    const rawResults = data.hits || data.products || [];
+    const products = rawResults
+      .map(p => ({ ...p, product_name: p.product_name || p.product_name_tr || p.product_name_en || p.generic_name || '' }))
+      .filter(p => p.product_name);
+    if(products.length === 0){
+      console.log('Isimle arama: sonuc bulunamadi. Ham yanit ornegi:', JSON.stringify(data).slice(0, 500));
+      box.innerHTML = `<div class="error">${td('noResultsFor', query)}</div>`;
+      return;
+    }
+    box.innerHTML = `
+      <div class="result-list">
+        ${products.map((p,i) => `
+          <button class="result-item" onclick='selectSearchResult(${i})'>
+            ${p.image_front_small_url ? `<img src="${escapeHtml(p.image_front_small_url)}">` : `<div style="width:44px;height:44px;border-radius:7px;background:var(--surface-2);"></div>`}
+            <div>
+              <div class="rname">${escapeHtml(p.product_name)}</div>
+              <div class="rbrand">${escapeHtml(p.brands || '-')} - ${escapeHtml(p.code)}</div>
+            </div>
+          </button>
+        `).join('')}
+      </div>
+    `;
+    state.lastSearchResults = products;
+  }catch(err){
+    console.log('Isimle arama hatasi:', err.message);
+    box.innerHTML = `<div class="error">${t('nameSearchUnstable')}</div>`;
+  }
+}
+
+function selectSearchResult(index){
+  const p = state.lastSearchResults[index];
+  renderProductResult(p, p.code);
+}
+
+function renderProductResult(p, code){
+  setCachedProduct(code, p);
+  logAnalyticsEvent('product_scan_success', { method: state.searchMode === 'name' ? 'name' : 'barcode', barcode: code });
+  const box = document.getElementById('scan-result');
+  const rawName = p.product_name || p.generic_name || 'Bilinmeyen ürün';
+  const rawBrand = p.brands || '—';
+  const name = escapeHtml(rawName);
+  const brand = escapeHtml(rawBrand);
+  const img = p.image_front_small_url || p.image_url || '';
+  const safeName = onclickSafe(rawName);
+  const safeBrand = onclickSafe(rawBrand);
+  box.innerHTML = `
+    <div class="product-card">
+      ${img ? `<img src="${escapeHtml(img)}" alt="${name}">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--surface-2);"></div>`}
+      <div style="flex:1;">
+        <div class="pname">${name}</div>
+        <div class="pbrand">${brand} · barkod ${code}</div>
+        <div class="pbrand" style="opacity:0.7; margin-top:2px;">${p._source === 'upcitemdb' ? t('sourceUpc') : t('sourceOff')}
+          <button style="background:none; border:none; text-decoration:underline; color:var(--gold-soft); font-size:11px; cursor:pointer; margin-left:6px;" onclick="refreshProduct('${code}')">↻ ${t('refreshBtn')}</button>
+          <button id="product-share-btn" style="background:none; border:none; text-decoration:underline; color:var(--gold-soft); font-size:11px; cursor:pointer; margin-left:6px;">📤 ${t('shareBtn')}</button>
+        </div>
+      </div>
+    </div>
+    <button class="primary" style="background:var(--surface-2); color:var(--gold-soft); box-shadow:none; border:1px solid var(--line);" onclick="promptTrackProduct('${safeName}', '${safeBrand}', '${code}')">${t('trackThisProductBtn')}</button>
+    <div id="comparison-area"><div class="result"><span class="spinner"></span>${t('comparingPrices')}</div></div>
+  `;
+
+  const shareBtn2 = document.getElementById('product-share-btn');
+  if(shareBtn2) shareBtn2.onclick = () => shareText(`${name} - ${brand} (Fiyatla ile bulundu)`);
+
+  buildComparison(name, brand, code).then(html => {
+    const area = document.getElementById('comparison-area');
+    if(area) area.innerHTML = html;
+  });
+}
+
+// ---- Fuzzy matching demo ----
+function levenshtein(a, b){
+  a = a.toLowerCase(); b = b.toLowerCase();
+  const m = a.length, n = b.length;
+  const dp = Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0]=i;
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      const cost = a[i-1]===b[j-1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+cost);
+    }
+  }
+  return dp[m][n];
+}
+function similarity(a, b){
+  const dist = levenshtein(a, b);
+  const maxLen = Math.max(a.length, b.length) || 1;
+  return Math.round((1 - dist/maxLen) * 100);
+}
+
+// NOTE: Gerçek yurtdışı fiyatları için resmi ürün/fiyat API'leri (ör. Amazon Product
+// Advertising API, PriceAPI) entegre edilmelidir. Bu prototipte, aynı ürün adının
+// yurtdışı mağazalarında hafif farklı yazılmış hallerini simüle edip fuzzy matching
+// ile eşleştirme mantığını göstermek için örnek veriler kullanılıyor.
+const AFFILIATE_IDS = {
+  'amazon.de': 'SENIN_ID-21',
+  'amazon.fr': 'SENIN_ID-21',
+  'amazon.co.uk': 'SENIN_ID-21',
+  'hepsiburada.com': '',
+};
+
+function buildAffiliateUrl(storeDomain, query){
+  const searchUrl = `https://www.${storeDomain}/s?k=${encodeURIComponent(query)}`;
+  const affId = AFFILIATE_IDS[storeDomain];
+  return affId ? `${searchUrl}&tag=${affId}` : searchUrl;
+}
+
+function renderAdBanner(){
+  return `
+    <div class="ad-banner">
+      <span class="ad-label">${t('adSponsored')}</span>
+      <div class="ad-placeholder">${t('adPlaceholderText')}</div>
+    </div>
+  `;
+}
+
+async function buildComparison(name, brand, code){
+  const realOffers = await fetchRealOffers(name, brand, code);
+  const realRows = Array.isArray(realOffers) ? realOffersToEur(realOffers) : [];
+
+  if(realRows.length > 0){
+    const minPrice = realRows[0].priceEur;
+    const rows = realRows.map(r => `
+      <tr>
+        <td class="name-col">${escapeHtml(r.merchant)}</td>
+        <td class="${r.priceEur===minPrice?'cheapest':''}">€ ${formatNumber(r.priceEur, 2)}</td>
+        <td>
+          <a class="go-btn" href="${r.url}" target="_blank" rel="noopener">${t('goBtn')}</a>
+        </td>
+      </tr>
+    `).join('');
+    return `
+      <div class="data-badge data-badge-real">${t('realDataBadge')}</div>
+      <table class="compare">
+        <thead><tr><th>${t('compareStoreCountry')}</th><th>${t('comparePrice')}</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${renderAdBanner()}
+    `;
+  }
+
+  const query = `${brand} ${name}`.trim();
+  const variants = [
+    {country:'🇩🇪 ' + t('countryGermany'), store:'amazon.de', label: `${brand} ${name}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇫🇷 ' + t('countryFrance'), store:'amazon.fr', label: `${name} - ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇬🇧 ' + t('countryUK'), store:'amazon.co.uk', label: `${name}, ${brand}`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+    {country:'🇹🇷 ' + t('countryTurkey'), store:'hepsiburada.com', label: `${brand} ${name} TR`.trim(), priceEur: +(Math.random()*8+4).toFixed(2)},
+  ];
+  variants.forEach(v => {
+    v.score = similarity(query, v.label);
+    v.url = buildAffiliateUrl(v.store, query);
+  });
+  const minPrice = Math.min(...variants.map(v=>v.priceEur));
+  const rows = variants.map(v => `
+    <tr>
+      <td class="name-col">
+        ${v.country}<span class="match-tag ${v.score>=80?'match-high':'match-mid'}">${td('compareMatch', v.score)}</span>
+        <div class="store-name">${v.store}</div>
+      </td>
+      <td class="${v.priceEur===minPrice?'cheapest':''}">€ ${formatNumber(v.priceEur, 2)}</td>
+      <td>
+        <a class="go-btn" href="${v.url}" target="_blank" rel="sponsored noopener">${t('goBtn')}</a>
+      </td>
+    </tr>
+  `).join('');
+  return `
+    <div class="data-badge data-badge-fake">${t('fakeDataBadge')}</div>
+    <table class="compare">
+      <thead><tr><th>${t('compareStoreCountry')}</th><th>${t('comparePrice')}</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="note">
+      ${t('compareNote1')}<br><br>
+      ${t('compareNote2')}
+    </div>
+    ${renderAdBanner()}
+  `;
+}
+
+function renderTracking(){
+  const tracked = getTrackedItems();
+  return `
+    <header class="top">
+      <button class="backbtn" onclick="goTo('home')"><span class="back-arrow"></span> ${t('back')}</button>
+      <p class="eyebrow">${t('trackingEyebrow')}</p>
+      <h1>${t('trackingTitle')}</h1>
+      <p class="sub">${t('trackingSub')}</p>
+        <div class="row" style="margin-top:10px;">
+          <button class="chip" style="flex:1;" onclick="exportBackup()">💾 ${t('exportBtn')}</button>
+          <button class="chip" style="flex:1;" onclick="exportBackupFile()">📤 ${t('exportFileBtn')}</button>
+          <button class="chip" style="flex:1;" onclick="importBackup()">📥 ${t('importBtn')}</button>
+        </div>
+    </header>
+    <main>
+      ${tracked.length === 0 ? `
+        <div class="note">${t('trackEmpty')}</div>
+      ` : tracked.map(item => {
+        const safeId = onclickSafe(item.id);
+        return `
+        <div class="product-card" style="flex-direction:column; align-items:stretch;">
+          <div>
+            <div class="pname">${escapeHtml(item.name)}</div>
+            <div class="pbrand">${escapeHtml(item.brand)} · hedef fiyat: € ${formatNumber(item.targetPrice, 2)}</div>
+            <div style="margin-top:4px;">
+              ${item.hasRealPriceData
+                ? `<span class="match-tag match-high">${t('trackingRealPriceActive')}</span>`
+                : `<span class="match-tag match-mid">${t('trackingReminderOnly')}</span>`}
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="checkPriceNow('${safeId}')">${t('checkNowBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="editTrackedItem('${safeId}')">${t('editBtn')}</button>
+            <button class="go-btn" style="flex:1; text-align:center;" onclick="untrackProduct('${safeId}')">${t('dropBtn')}</button>
+          </div>
+        </div>
+      `;
+      }).join('')}
+      <div class="note">${t('trackingDisclaimer')}</div>
+    </main>
+    <footer>${t('footerTracking')}</footer>
+  `;
+}
+
+const TRACKING_KEY = 'fiyatla_tracked_items';
+
+// localStorage'daki bir JSON dizisini guvenle okur. Veri bozuksa (ornegin
+// gelecekte bir format degisikligi ya da beklenmedik bir yazma hatasi
+// yuzunden), sessizce [] donup ustune bos veri yazilmasina izin vermek
+// yerine, once ham veriyi bir "kurtarma" anahtarina yedekler - boylece
+// bir sonraki kaydetme islemi kullanicinin (belki hala kurtarilabilir)
+// verisini kalici olarak silmis olmaz.
+function loadJsonArrayFromStorage(key){
+  const raw = localStorage.getItem(key);
+  try{
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(e){
+    if(raw){
+      try{
+        localStorage.setItem(key + '_corrupted_backup', JSON.stringify({ raw, timestamp: new Date().toISOString() }));
+      }catch(e2){}
+    }
+    return [];
+  }
+}
+
+function getTrackedItems(){
+  return loadJsonArrayFromStorage(TRACKING_KEY);
+}
+
+function nextNotifId(items){
+  const used = new Set((items || getTrackedItems()).map(i => i.notifId).filter(id => id));
+  let id;
+  do{
+    id = Math.floor(Math.random() * 100000);
+  }while(used.has(id));
+  return id;
+}
+
+function saveTrackedItems(items){
+  try{
+    localStorage.setItem(TRACKING_KEY, JSON.stringify(items));
+  }catch(e){
+    console.log('Takip listesi kaydedilemedi:', e.message);
+  }
+  syncBackgroundRunnerData(items);
+}
+
+function syncBackgroundRunnerData(items){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.BackgroundRunner) return;
+  const minimalItems = (items || getTrackedItems()).map(i => ({ id: i.id, code: i.code, name: i.name, targetPrice: i.targetPrice }));
+  window.Capacitor.Plugins.BackgroundRunner.dispatchEvent({
+    label: 'com.hudayi.fiyatkontrol.pricecheck',
+    event: 'syncData',
+    details: { items: minimalItems, rates: RATES_TO_EUR },
+  }).catch(()=>{});
+}
+
+const SEARCH_HISTORY_KEY = 'fiyatla_search_history';
+
+function getSearchHistory(){
+  return loadJsonArrayFromStorage(SEARCH_HISTORY_KEY);
+}
+
+function saveSearchHistory(history){
+  try{ localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history)); }catch(e){}
+}
+
+async function requestNotificationPermission(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.LocalNotifications){
+    showToast(t('notifPermissionDenied'));
+    return false;
+  }
+  try{
+    const current = await window.Capacitor.Plugins.LocalNotifications.checkPermissions();
+    if(current.display === 'granted') return true;
+    const req = await window.Capacitor.Plugins.LocalNotifications.requestPermissions();
+    if(req.display !== 'granted'){
+      showToast(t('notifPermissionDenied'));
+      return false;
+    }
+    return true;
+  }catch(e){
+    showToast(t('notifPermissionDenied'));
+    return false;
+  }
+}
+
+function parseTargetPriceInput(){
+  const input = document.getElementById('target-price-input');
+  const target = parseFloat(input.value.replace(',', '.'));
+  if(isNaN(target) || target <= 0){
+    input.style.borderColor = 'var(--danger)';
+    return null;
+  }
+  return target;
+}
+
+async function scheduleTrackingNotification(name, targetPrice, { onError, existingItems } = {}){
+  const granted = await requestNotificationPermission();
+  if(!granted) return null;
+  const notifId = nextNotifId(existingItems);
+  try{
+    await window.Capacitor.Plugins.LocalNotifications.schedule({
+      notifications: [{
+        id: notifId,
+        title: t('notifTitle'),
+        body: td('notifBody', name, formatNumber(targetPrice, 2)),
+        schedule: { at: new Date(Date.now() + 24*60*60*1000), repeats: true, every: 'day' },
+      }]
+    });
+    return notifId;
+  }catch(e){
+    if(onError) onError(e);
+    return null;
+  }
+}
+
+async function trackProduct(name, brand, code, targetPrice){
+  const items = getTrackedItems();
+  const id = `${code}_${Date.now()}`;
+  const [notifId, realOffers] = await Promise.all([
+    scheduleTrackingNotification(name, targetPrice, {
+      existingItems: items,
+      onError: (e) => showToast(td('trackScheduleError', e.message))
+    }),
+    fetchRealOffers(name, brand, code),
+  ]);
+
+  items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: Array.isArray(realOffers) });
+  saveTrackedItems(items);
+  logAnalyticsEvent('product_tracked', { barcode: code, target_price: targetPrice });
+  if(notifId){
+    showToast(td('trackSuccess', name));
+  }
+}
+
+async function checkPriceNow(id){
+  const items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(!item) return;
+
+  showToast(t('checkingPriceNow'));
+
+  const offers = await fetchRealOffers(item.name, item.brand, item.code);
+  if(offers === UPCITEMDB_RATE_LIMITED){
+    showToast(td('checkNowRateLimited', item.name));
+    return;
+  }
+  const rows = Array.isArray(offers) ? realOffersToEur(offers) : [];
+
+  item.hasRealPriceData = rows.length > 0;
+  saveTrackedItems(items);
+
+  if(rows.length === 0){
+    showToast(td('checkNowNoData', item.name));
+  }else{
+    const lowestEur = rows[0].priceEur;
+    if(lowestEur <= item.targetPrice){
+      showToast(td('checkNowTargetReached', item.name, formatNumber(lowestEur, 2)));
+    }else{
+      showToast(td('checkNowPriceFound', item.name, formatNumber(lowestEur, 2)));
+    }
+  }
+  render();
+}
+
+async function untrackProduct(id){
+  let items = getTrackedItems();
+  const item = items.find(i => i.id === id);
+  if(item && item.notifId && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
+    window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: [{ id: item.notifId }] }).catch(()=>{});
+  }
+  items = items.filter(i => i.id !== id);
+  saveTrackedItems(items);
+  render();
+}
+
+function promptTrackProduct(name, brand, code){
+  const safeName2 = onclickSafe(name);
+  const safeBrand2 = onclickSafe(brand);
+  openModal('track-modal-overlay', `
+    <div class="modal-card">
+      <p class="eyebrow">${t('trackModalEyebrow')}</p>
+      <h3 class="modal-title" id="modal-a11y-title">${escapeHtml(name)}</h3>
+      <p class="modal-sub">${t('trackModalSub')}</p>
+      <input type="number" id="target-price-input" value="5.00" step="0.01" inputmode="decimal" />
+      <div class="modal-actions">
+        <button class="modal-btn-secondary" onclick="closeTrackModal()">${t('trackVazgec')}</button>
+        <button class="modal-btn-primary" onclick="confirmTrackProduct('${safeName2}','${safeBrand2}','${code}')">${t('trackConfirm')}</button>
+      </div>
+    </div>
+  `);
+}
+
+function openModal(id, innerHtml){
+  closeModal(id);
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = id;
+  overlay.innerHTML = innerHtml;
+  document.body.appendChild(overlay);
+  initModalA11y(overlay);
+  return overlay;
+}
+
+function closeModal(id){
+  const el = document.getElementById(id);
+  if(el){
+    if(el._a11yCleanup) el._a11yCleanup();
+    el.remove();
+  }
+}
+
+function initModalA11y(overlay){
+  const previouslyFocused = document.activeElement;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'modal-a11y-title');
+  const focusables = overlay.querySelectorAll('button, input, [tabindex]');
+  if(focusables.length) focusables[0].focus();
+  function trap(e){
+    if(e.key === 'Escape'){
+      overlay.querySelector('.modal-btn-secondary, .chip, .modal-btn-primary')?.click();
+    }else if(e.key === 'Tab' && focusables.length){
+      const first = focusables[0];
+      const last = focusables[focusables.length-1];
+      if(e.shiftKey && document.activeElement === first){
+        e.preventDefault();
+        last.focus();
+      }else if(!e.shiftKey && document.activeElement === last){
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+  overlay.addEventListener('keydown', trap);
+  overlay._a11yCleanup = () => {
+    overlay.removeEventListener('keydown', trap);
+    if(previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
+  };
+}
+
+function closeTrackModal(){
+  closeModal('track-modal-overlay');
+}
+
+function confirmTrackProduct(name, brand, code){
+  const target = parseTargetPriceInput();
+  if(target === null) return;
+  closeTrackModal();
+  trackProduct(name, brand, code, target);
+}
+
+// ---- AdMob entegrasyonu ----
+// NOT: Bu ID'ler GERCEK, canli AdMob hesabina ait (App ID kullanici
+// tarafindan dogrulandi - test ID'si DEGIL). Bu yuzden:
+// - initialize() 'initializeForTesting: false' ile cagriliyor (asagida).
+// - Gelistirme/test sirasinda bu reklamlara TIKLAMA - gercek tiklamalar
+//   "gecersiz trafik" sayilip AdMob hesabinin askiya alinmasina yol acabilir.
+// - Yerel/emulator testi icin gecici olarak Google'in resmi test ID'lerini
+//   (App ID: ca-app-pub-3940256099942544~3347511713) kullanmayi tercih
+//   edebilirsin, sonra release'den once gercek ID'lere geri donersin.
+const ADMOB_BANNER_ID = 'ca-app-pub-3346239396398803/8779821335';
+let admobReady = false;
+
+const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-3346239396398803/8620837997';
+
+async function showInterstitialOnce(){
+  if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    window.__interstitialActive = true;
+    await window.Capacitor.Plugins.AdMob.prepareInterstitial({
+      adId: ADMOB_INTERSTITIAL_ID,
+      isTesting: false,
+    });
+    setTimeout(async () => {
+      try{
+        await window.Capacitor.Plugins.AdMob.showInterstitial();
+      }catch(e){
+        window.__interstitialActive = false;
+        console.log('Interstitial gosterilemedi:', e.message);
+      }
+    }, 1500);
+  }catch(e){
+    window.__interstitialActive = false;
+    console.log('Interstitial hazirlanamadi:', e.message);
+  }
+}
+
+function setupInterstitialListener(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  window.Capacitor.Plugins.AdMob.addListener('interstitialAdDismissed', () => {
+    window.__interstitialActive = false;
+    if(window.__pendingRatePromptCount !== null && window.__pendingRatePromptCount !== undefined){
+      const count = window.__pendingRatePromptCount;
+      window.__pendingRatePromptCount = null;
+      maybeShowRatePrompt(count);
+    }
+  });
+  window.Capacitor.Plugins.AdMob.addListener('interstitialAdFailedToShow', () => {
+    window.__interstitialActive = false;
+  });
+}
+
+async function handleConsent(){
+  window.adConsentAvailable = false;
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    const consentInfo = await window.Capacitor.Plugins.AdMob.requestConsentInfo();
+    window.adConsentAvailable = !!consentInfo.isConsentFormAvailable;
+    if(consentInfo.isConsentFormAvailable && consentInfo.status === 'REQUIRED'){
+      await window.Capacitor.Plugins.AdMob.showConsentForm();
+    }
+  }catch(e){
+    console.log('Consent alinamadi:', e.message);
+  }
+}
+
+async function initAnalytics(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  try{
+    await window.Capacitor.Plugins.FirebaseAnalytics.setEnabled({ enabled: true });
+  }catch(e){}
+}
+
+function logAnalyticsEvent(name, params){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  window.Capacitor.Plugins.FirebaseAnalytics.logEvent({ name, params }).catch(()=>{});
+}
+
+function logScreenView(screenName){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseAnalytics) return;
+  window.Capacitor.Plugins.FirebaseAnalytics.setCurrentScreen({ screenName }).catch(()=>{});
+}
+
+async function initAdMob(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob){
+    maybeShowOnboarding(window.fiyatlaOpenCount);
+    return;
+  }
+  try{
+    await window.Capacitor.Plugins.AdMob.initialize({
+      testingDevices: [],
+      initializeForTesting: false,
+    });
+    admobReady = true;
+    await handleConsent();
+    maybeShowOnboarding(window.fiyatlaOpenCount);
+    setupAdSizeListener();
+    setupInterstitialListener();
+    showBannerAd();
+    if(window.fiyatlaOpenCount > 1 && shouldShowInterstitial()) showInterstitialOnce();
+  }catch(e){
+    console.log('AdMob baslatilamadi:', e.message);
+    maybeShowOnboarding(window.fiyatlaOpenCount);
+  }
+}
+
+let adsEnabled = true;
+try{ adsEnabled = localStorage.getItem('fiyatla_ads_enabled') !== 'false'; }catch(e){}
+
+function setupAdSizeListener(){
+  window.adDebugInfo = 'listener kurulmadi (AdMob yok)';
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.AdMob) return;
+  window.adDebugInfo = 'listener kuruldu, olay bekleniyor';
+  try{
+    window.Capacitor.Plugins.AdMob.addListener('bannerAdSizeChanged', (info) => {
+      window.adDebugInfo = 'olay geldi: ' + JSON.stringify(info);
+      if(info && info.height){
+        document.documentElement.style.setProperty('--ad-height', Math.max(info.height - 6, 0) + 'px');
+      }
+      render();
+    });
+  }catch(e){
+    window.adDebugInfo = 'hata: ' + e.message;
+  }
+}
+
+async function showBannerAd(){
+  if(!adsEnabled) return;
+  if(!admobReady || !window.Capacitor.Plugins.AdMob) return;
+  try{
+    await window.Capacitor.Plugins.AdMob.showBanner({
+      adId: ADMOB_BANNER_ID,
+      adSize: 'ADAPTIVE_BANNER',
+      position: 'TOP_CENTER',
+      margin: 0,
+      isTesting: false,
+    });
+  }catch(e){
+    console.log('Banner gosterilemedi:', e.message);
+  }
+}
+
+async function handleGalleryImage(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const box = document.getElementById('scan-result');
+  if(!('BarcodeDetector' in window)){
+    box.innerHTML = `<div class="error">${t('galleryUnsupported')}</div>`;
+    event.target.value = '';
+    return;
+  }
+  box.innerHTML = `<div class="result"><span class="spinner"></span>${t('searchingProduct')}</div>`;
+  try{
+    const bitmap = await createImageBitmap(file);
+    const detector = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']});
+    const codes = await detector.detect(bitmap);
+    if(codes.length === 0){
+      box.innerHTML = `<div class="error">${t('galleryNoBarcode')}</div>`;
+      event.target.value = '';
+      return;
+    }
+    const rawValue = codes[0].rawValue;
+    state.searchMode = 'barcode';
+    render();
+    document.getElementById('barcode').value = rawValue;
+    lookupBarcode();
+  }catch(e){
+    box.innerHTML = `<div class="error">${td('productFetchError', e.message)}</div>`;
+  }
+  event.target.value = '';
+}
+
+function shouldShowInterstitial(){
+  try{
+    const last = parseInt(localStorage.getItem('fiyatla_last_interstitial') || '0', 10);
+    const now = Date.now();
+    if(now - last < 10 * 60 * 1000) return false;
+    localStorage.setItem('fiyatla_last_interstitial', String(now));
+    return true;
+  }catch(e){
+    return true;
+  }
+}
+
+window.addEventListener('error', (event) => {
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseCrashlytics){
+      window.Capacitor.Plugins.FirebaseCrashlytics.recordException({
+        message: 'Global hata: ' + (event.message || 'bilinmeyen hata'),
+      });
+    }
+  }catch(e){}
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseCrashlytics){
+      const reason = (event.reason && event.reason.message) ? event.reason.message : String(event.reason);
+      window.Capacitor.Plugins.FirebaseCrashlytics.recordException({
+        message: 'Yakalanmamis Promise hatasi: ' + reason,
+      });
+    }
+  }catch(e){}
+});
+
+window.__pendingRatePromptCount = null;
+window.fiyatlaOpenCount = getAppOpenCount();
+setTimeout(cleanupExpiredCache, 0);
+initAnalytics();
+logScreenView(state.screen);
+initAdMob();
+fetchLiveRates();
+setupBackButton();
+setupDeepLinks();
+setupOfflineDetection();
+checkForUpdate();
+setTimeout(() => {
+  if(window.__interstitialActive){
+    window.__pendingRatePromptCount = window.fiyatlaOpenCount;
+  }else{
+    maybeShowRatePrompt(window.fiyatlaOpenCount);
+  }
+}, 2500);
+
+let lastBackPress = 0;
+
+function showToast(message){
+  const existing = document.getElementById('app-toast');
+  if(existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'app-toast';
+  el.className = 'toast';
+  el.textContent = message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  }, 1800);
+}
+
+function exitToastMessage(){
+  const msgs = {
+    de: 'Tippe erneut zum Beenden',
+    tr: 'Çıkmak için tekrar dokun',
+    en: 'Tap again to exit',
+    ja: 'もう一度タップして終了',
+    zh: '再次点击退出',
+  };
+  return msgs[state.lang] || msgs.tr;
+}
+
+function handleDeepLinkUrl(url){
+  if(!url) return;
+  if(url.indexOf('scan') !== -1) goTo('scan');
+  else if(url.indexOf('convert') !== -1) goTo('convert');
+  else if(url.indexOf('tracking') !== -1) goTo('tracking');
+}
+
+async function setupDeepLinks(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('appUrlOpen', (data) => {
+    handleDeepLinkUrl(data && data.url);
+  });
+  try{
+    const launch = await window.Capacitor.Plugins.App.getLaunchUrl();
+    if(launch && launch.url){
+      handleDeepLinkUrl(launch.url);
+    }
+  }catch(e){}
+}
+
+function setupBackButton(){
+  if(!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('backButton', () => {
+    if(state.screen !== 'home'){
+      goTo('home');
+      return;
+    }
+    const now = Date.now();
+    if(now - lastBackPress < 2000){
+      window.Capacitor.Plugins.App.exitApp();
+    }else{
+      lastBackPress = now;
+      showToast(exitToastMessage());
+    }
+  });
+}
+
+render();

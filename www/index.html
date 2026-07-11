@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Kur & Fiyat Kontrol</title>
+<title>Fiyatla</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -173,6 +173,15 @@
   }
   select{font-family:'Inter',sans-serif; font-size:14.5px;}
   input:focus, select:focus{border-color:var(--gold);}
+
+  /* Klavye/TalkBack gibi klavye-benzeri navigasyon icin gorunur odak
+     halkasi - :focus-visible kullanildigi icin dokunmatik tiklamalarda
+     gereksiz gorsel gurultu olusturmaz, sadece klavye/erisilebilirlik
+     navigasyonunda belirir. */
+  button:focus-visible, a:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--teal);
+    outline-offset:2px;
+  }
 
   .swap-btn{
     background:var(--surface-2);
@@ -751,6 +760,10 @@
 <body>
 <div class="app" id="app"></div>
 
+<!-- Gitignore'da, repoya commit edilmez - bkz. www/local-config.example.js.
+     Dosya yoksa (fresh checkout / CI) tarayici sessizce 404 verir, sayfa
+     calismaya devam eder; PRICE_LOOKUP_APP_SECRET bos string olarak kalir. -->
+<script src="local-config.js"></script>
 <script>
 const CURRENCIES = ['TRY','USD','GBP','EUR','JPY','CHF','CNY'];
 
@@ -1191,6 +1204,13 @@ const TRANSLATIONS_FN = {
     ja: `❓ ${name}の実際の価格データが見つかりません`,
     zh: `❓ 未找到${name}的真实价格数据`,
   }),
+  checkNowRateLimited: (name) => ({
+    tr: `⏳ ${name}: Günlük fiyat sorgulama limiti doldu, lütfen yarın tekrar dene`,
+    en: `⏳ ${name}: Daily price lookup limit reached, please try again tomorrow`,
+    de: `⏳ ${name}: Taegliches Preisabfragelimit erreicht, bitte versuche es morgen erneut`,
+    ja: `⏳ ${name}: 1日の価格照会上限に達しました。明日もう一度お試しください`,
+    zh: `⏳ ${name}: 已达到每日价格查询上限，请明天再试`,
+  }),
   sparklineAria: (from, to, pct, up) => ({
     tr: `${from} / ${to} son 7 gün trendi: ${up ? 'yükseldi' : 'düştü'} %${pct}`,
     en: `${from} / ${to} 7-day trend: ${up ? 'up' : 'down'} ${pct}%`,
@@ -1259,6 +1279,11 @@ try{ savedThemeOverride = localStorage.getItem('fiyatla_theme_override') || null
 const initialFromCcy = LANG_TO_CCY[savedLang] || 'TRY';
 const initialToCcy = initialFromCcy === 'USD' ? 'EUR' : 'USD';
 let state = { screen: 'home', stream: null, fromCcy: initialFromCcy, toCcy: initialToCcy, lang: savedLang, themeOverride: savedThemeOverride };
+// <html lang="tr"> statik olarak yazilmisti; kaydedilmis bir dil tercihi
+// varsa (ekran okuyucular/tarayici dil algilamasi icin) acilista da
+// uygulanmali - onceden sadece kullanici elle dil degistirdiginde
+// (setLanguage()) guncelleniyordu.
+document.documentElement.lang = savedLang;
 
 function systemPrefersDark(){
   try{
@@ -2217,14 +2242,56 @@ function setCachedProduct(code, product){
   }catch(e){}
 }
 
-async function fetchRealOffers(code){
-  if(!code) return null;
+// Gercek fiyat verisi artik UPCitemDB'den degil, ayri ve private tutulan
+// "fiyatla-backend" reposundan (Vercel'e deploy edilir) geliyor - bu
+// backend'in ic mantigi (prompt, model secimi, JSON semasi) burada yok,
+// sadece asagidaki URL'e HTTP istegi atiliyor. Backend gunluk/dakikalik
+// limit veya Anthropic tarafi 429/529 donerse ayni sekilde HTTP 429 ile
+// cevap verir; bunu sessizce "veri yok" ile karistirmamak icin ozel bir
+// isaretci (sentinel) string donuyoruz - cagiran taraflar bunu
+// Array.isArray() ile ayirt edebilir.
+const UPCITEMDB_RATE_LIMITED = 'RATE_LIMITED';
+
+// Vercel'e deploy ettikten sonra projenin gercek alan adiyla guncelle
+// fiyatla-backend'in Vercel'deki gercek adresi.
+const PRICE_LOOKUP_API_URL = 'https://fiyatla-backend.vercel.app/api/price-lookup';
+// Bu, Anthropic API anahtari DEGIL - sadece bu uc noktayi genel internetten
+// gelen rastgele isteklere karsi hafifce kapatan paylasilan bir sirdir.
+// Gercek deger Vercel panelinde APP_SHARED_SECRET olarak tanimlidir - buraya
+// commit edilmez, elle doldurulur.
+const PRICE_LOOKUP_APP_SECRET = '';
+// search.openfoodfacts.org icin kullanilan nativeGet'in POST karsiligi -
+// ayni CORS/WebView nedenleriyle native platformda CapacitorHttp uzerinden
+// gonderiyoruz, duz webde fetch()'e dusuyoruz.
+async function nativePost(url, body, headers){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp){
+    const res = await window.Capacitor.Plugins.CapacitorHttp.post({ url, headers, data: body });
+    let data = res.data;
+    if(typeof data === 'string'){
+      try{ data = JSON.parse(data); }catch(e){}
+    }
+    return { ok: res.status >= 200 && res.status < 300, status: res.status, data };
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, data };
+}
+
+async function fetchRealOffers(name, brand, code){
+  if(!name) return null;
   try{
-    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
-    if(!res.ok) return null;
-    const data = await res.json();
-    if(!data.items || data.items.length === 0) return null;
-    const offers = data.items[0].offers || [];
+    const res = await nativePost(
+      PRICE_LOOKUP_API_URL,
+      { name, brand, code },
+      PRICE_LOOKUP_APP_SECRET ? { 'X-App-Secret': PRICE_LOOKUP_APP_SECRET } : {},
+    );
+    if(res.status === 429) return UPCITEMDB_RATE_LIMITED;
+    if(!res.ok || !res.data) return null;
+    const offers = res.data.offers || [];
     return offers.length > 0 ? offers : null;
   }catch(e){
     return null;
@@ -2238,9 +2305,9 @@ function realOffersToEur(offers){
     const currency = (offer.currency || 'USD').toUpperCase();
     if(!RATES_TO_EUR[currency]) continue;
     rows.push({
-      merchant: offer.merchant || offer.domain || '—',
+      merchant: offer.merchant || '—',
       priceEur: convertAmount(offer.price, currency, 'EUR'),
-      url: offer.link || '#',
+      url: offer.url || '#',
     });
   }
   rows.sort((a,b) => a.priceEur - b.priceEur);
@@ -2459,8 +2526,8 @@ function renderAdBanner(){
 }
 
 async function buildComparison(name, brand, code){
-  const realOffers = await fetchRealOffers(code);
-  const realRows = realOffers ? realOffersToEur(realOffers) : [];
+  const realOffers = await fetchRealOffers(name, brand, code);
+  const realRows = Array.isArray(realOffers) ? realOffersToEur(realOffers) : [];
 
   if(realRows.length > 0){
     const minPrice = realRows[0].priceEur;
@@ -2688,10 +2755,10 @@ async function trackProduct(name, brand, code, targetPrice){
       existingItems: items,
       onError: (e) => showToast(td('trackScheduleError', e.message))
     }),
-    fetchRealOffers(code),
+    fetchRealOffers(name, brand, code),
   ]);
 
-  items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: !!realOffers });
+  items.push({ id, name, brand, code, targetPrice, notifId, hasRealPriceData: Array.isArray(realOffers) });
   saveTrackedItems(items);
   logAnalyticsEvent('product_tracked', { barcode: code, target_price: targetPrice });
   if(notifId){
@@ -2706,8 +2773,12 @@ async function checkPriceNow(id){
 
   showToast(t('checkingPriceNow'));
 
-  const offers = await fetchRealOffers(item.code);
-  const rows = offers ? realOffersToEur(offers) : [];
+  const offers = await fetchRealOffers(item.name, item.brand, item.code);
+  if(offers === UPCITEMDB_RATE_LIMITED){
+    showToast(td('checkNowRateLimited', item.name));
+    return;
+  }
+  const rows = Array.isArray(offers) ? realOffersToEur(offers) : [];
 
   item.hasRealPriceData = rows.length > 0;
   saveTrackedItems(items);
@@ -2813,9 +2884,14 @@ function confirmTrackProduct(name, brand, code){
 }
 
 // ---- AdMob entegrasyonu ----
-// NOT: Bu asagidaki ID'ler Google'in resmi TEST ID'leridir, gercek para
-// kazandirmaz. Gercek AdMob hesabini actiktan sonra bu ID'leri kendi
-// gercek App ID ve Ad Unit ID'lerinle degistirmen gerekiyor.
+// NOT: Bu ID'ler GERCEK, canli AdMob hesabina ait (App ID kullanici
+// tarafindan dogrulandi - test ID'si DEGIL). Bu yuzden:
+// - initialize() 'initializeForTesting: false' ile cagriliyor (asagida).
+// - Gelistirme/test sirasinda bu reklamlara TIKLAMA - gercek tiklamalar
+//   "gecersiz trafik" sayilip AdMob hesabinin askiya alinmasina yol acabilir.
+// - Yerel/emulator testi icin gecici olarak Google'in resmi test ID'lerini
+//   (App ID: ca-app-pub-3940256099942544~3347511713) kullanmayi tercih
+//   edebilirsin, sonra release'den once gercek ID'lere geri donersin.
 const ADMOB_BANNER_ID = 'ca-app-pub-3346239396398803/8779821335';
 let admobReady = false;
 
